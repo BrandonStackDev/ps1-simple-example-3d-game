@@ -22,6 +22,7 @@ setup for windows (could probably be easily adjusted for linux with a proper sh 
     - then you will need a .vscode/launch.json setup like this so ou can lunch the debug client
         - notice, points at game.elf, not game.psexe
 
+```json
 {
     "version": "0.2.0",
     "configurations": [
@@ -41,8 +42,8 @@ setup for windows (could probably be easily adjusted for linux with a proper sh 
         }
     ]
 }
-
+```
 
 to build just call "build" from cmd in the project folder
 
-if you add any .c files be sure to edit the bat script, they need to go into the sources.rsp file (I am not clever enough to do it automatically in cmd, also, cmd is the worst shell language by farm, I have ever come across; If shell scripting is one of Microsoft's love languages, then they are all full of hate...just saying)
+if you add any .c files be sure to edit the bat script, they need to go into the sources.rsp file (I am not clever enough to do it automatically in cmd, also, cmd is the worst shell language by far, I have ever come across; If shell scripting is one of Microsoft's love languages, then they are all full of hate...just saying)

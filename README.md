@@ -17,9 +17,9 @@ setup for windows (could probably be easily adjusted for linux with a proper sh 
         - gcc-mipsel-none-elf-12.3.0-windows.zip (what I used)
         - add the unzipped folder to your PATH env variable so you dont need to qualify the full path when calling it
  - install pcsx-redux emulator for debug server stuff
-    - (use link here to isntall, https://www.psx.dev/getting-started)
+    - (use link here to install, https://www.psx.dev/getting-started)
     - you will need to enable the gdb server (I used port 3002)
-    - then you will need a .vscode/launch.json setup like this so ou can lunch the debug client
+    - then you will need a .vscode/launch.json setup like this so you can lunch the debug client
         - notice, points at game.elf, not game.psexe
 
 ```json
@@ -30,7 +30,7 @@ setup for windows (could probably be easily adjusted for linux with a proper sh 
             "name": "Attach to PCSX-Redux (gdbserver :3002)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}\\build\\game.elf", //use the elf, cause thats the real mips binary, psexe is converted by spicy's script
+            "program": "${workspaceFolder}\\build\\game.elf",
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",
             "miDebuggerPath": "path_to_tools\\gdb-multiarch-16.3\\bin\\gdb-multiarch.exe",

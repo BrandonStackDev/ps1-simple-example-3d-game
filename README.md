@@ -44,6 +44,45 @@ setup for windows (could probably be easily adjusted for linux with a proper sh 
 }
 ```
 
+Also, i have something like this in my .vscode\c_cpp_properties.json for intelli-sense
+```json
+{
+    "configurations": [
+        {
+            "name": "PSX",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}\\libc",
+                "${workspaceFolder}\\ps1",
+                "${workspaceFolder}\\vendor",
+                "path_to_comp\\mipsel-none-elf\\include",
+                "path_to_comp\\lib\\gcc\\mipsel-none-elf\\12.3.0\\include"
+            ],
+            "defines": ["_DEBUG"],
+            "compilerArgs": [
+                "-Os",
+                "-ffreestanding",
+                "-fno-builtin",
+                "-nostdlib",
+                "-march=r3000",
+                "-mabi=32",
+                "-mno-abicalls",
+                "-G0",
+                "-I${workspaceFolder}\\libc",
+                "-I${workspaceFolder}\\ps1",
+                "-I${workspaceFolder}\\vendor"
+            ],
+            "windowsSdkVersion": "10.0.26100.0",
+            "compilerPath": "path_to_comp\\mipsel-none-elf-gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x86"
+        }
+    ],
+    "version": 4
+}
+```
+
 to build just call "build" from cmd in the project folder
 
 if you add any .c files be sure to edit the bat script, they need to go into the sources.rsp file (I am not clever enough to do it automatically in cmd, also, cmd is the worst shell language by far, I have ever come across; If shell scripting is one of Microsoft's love languages, then they are all full of hate...just saying)

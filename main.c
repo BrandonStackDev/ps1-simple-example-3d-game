@@ -226,7 +226,7 @@ int main(int argc, const char **argv) {
 		frameCounter++;
 		int backFaceCnt = 0;
 		int gteErrorCnt = 0;
-		int tooNearCnt = 0;
+		int allTooNearCnt = 0; // can add othre counters as needed
 		// Draw the cube one face at a time.
 		for (int i = 0; i < NUM_CUBE_FACES; i++) {
 			const Face *face = &cubeFaces[i];
@@ -241,23 +241,42 @@ int main(int argc, const char **argv) {
 			int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) //// SZ0/SZ1/SZ2 are the transformed depths
 			int sz1 = tv1.z; //gte_getDataReg(GTE_SZ1)
 			int sz2 = tv2.z; //gte_getDataReg(GTE_SZ2)
-			//TODO: handle the near clip stuff, deal with off screen
-			// if (sz0 < NEAR_Z || sz1 < NEAR_Z || sz2 < NEAR_Z) 
-			// {
-			// 	tooNearCnt++;
-			// 	continue;
-			// }
-			//Classify vertices by z >= NEAR_Z.
-			// Cases:
-			// 0 inside → discard
-			// 3 inside → keep as-is
-			// 1 inside → output 1 triangle
-			// 2 inside → output 2 triangles
-			// Intersection along an edge (A→B):
-			// t = (NEAR_Z - Az) / (Bz - Az)
-			// P = A + t*(B - A)
+			//handle the near clip stuff, deal with off screen
+			if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
+			{
+				allTooNearCnt++;
+				continue;
+			}
+			else if (sz0 < NEAR_Z || sz1 < NEAR_Z || sz2 < NEAR_Z)
+			{
+				if(sz0 < NEAR_Z && !(sz1 < NEAR_Z || sz2 < NEAR_Z)) //its sz0
+				{
 
+				}
+				else if(sz1 < NEAR_Z && !(sz0 < NEAR_Z || sz2 < NEAR_Z)) //its sz1
+				{
+					
+				}
+				else if(sz2 < NEAR_Z && !(sz0 < NEAR_Z || sz1 < NEAR_Z)) //its sz2
+				{
+					
+				}
+				else //at this point we know it has to be a two vert case
+				{
+					if(sz0 < NEAR_Z && sz1 < NEAR_Z) //sz0 and sz1
+					{
+						
+					}
+					else if(sz0 < NEAR_Z && sz2 < NEAR_Z) //sz0 and sz2
+					{
+						
+					}
+					else //has to be sz1 and sz2
+					{
 
+					}
+				}
+			}
 
 			// apply perspective to computed tris
 			SetGtePosAndRot( 0, 0, 0, 0, 0, 0 );
@@ -322,7 +341,7 @@ int main(int argc, const char **argv) {
 		waitForGP0Ready();
 		waitForVSync();
 		sendLinkedList(&(chain->orderingTable)[ORDERING_TABLE_SIZE - 1]);
-		int c = (tooNearCnt + backFaceCnt + gteErrorCnt);
+		int c = (allTooNearCnt + backFaceCnt + gteErrorCnt);
 		if(c>10000){continue;}
 		printf("help");
 	}

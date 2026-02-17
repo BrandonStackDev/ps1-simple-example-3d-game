@@ -53,7 +53,7 @@
 // bits long). We'll define this unit value to make their handling easier.
 #define ONE (1 << 12)
 // pick a near plane in your units (tune this)
-#define NEAR_Z 16
+#define NEAR_Z 32
 
 static void setupGTE(int width, int height) {
 	// Ensure the GTE, which is coprocessor 2, is enabled. MIPS coprocessors are
@@ -170,16 +170,105 @@ static void SetGtePosAndRot(int x, int y, int z, int yaw, int pitch, int roll)
 		rotateCurrentMatrix(yaw, pitch, roll);
 }
 
+static inline int clampi(int v, int lo, int hi)
+{
+    return (v < lo) ? lo : (v > hi) ? hi : v;
+}
+
+// Intersect segment A->B with plane z = nearZ.
+// Assumes A is inside (Az >= nearZ) and B is outside (Bz < nearZ).
+static GTEVector16 IntersectNear(const GTEVector16* A, const GTEVector16* B, int nearZ)
+{
+    int32_t Az = A->z;
+    int32_t Bz = B->z;
+    int32_t denom = (Bz - Az);              // negative in the "inside->outside" case
+    if (denom == 0) {
+        GTEVector16 P = *A;
+        P.z = (int16_t)nearZ;
+        return P;
+    }
+
+    // t in 12-bit fixed: t12 = ((nearZ - Az) / (Bz - Az)) * 4096
+    int32_t t12 = ((int32_t)(nearZ - Az) << 12) / denom;
+    t12 = clampi(t12, 0, 1 << 12);          // keep it sane (0..4096)
+
+    int32_t dx = (int32_t)B->x - (int32_t)A->x;
+    int32_t dy = (int32_t)B->y - (int32_t)A->y;
+
+    GTEVector16 P;
+    P.x = (int16_t)( (int32_t)A->x + ((dx * t12) >> 12) );
+    P.y = (int16_t)( (int32_t)A->y + ((dy * t12) >> 12) );
+    P.z = (int16_t)nearZ;
+    P._padding = 0;
+    return P;
+}
+
 static GTEVector16 gte_mvmva_cam(const GTEVector16* v)
 {
     gte_loadV0(v);
-    gte_command(GTE_CMD_MVMVA | GTE_SF);
+    //gte_command(GTE_CMD_MVMVA | GTE_SF);
+	gte_command(GTE_CMD_MVMVA | GTE_SF | GTE_MX_RT | GTE_V_V0 | GTE_CV_TR);
 
     GTEVector16 o;
     o.x = (int)gte_getDataReg(GTE_MAC1);
     o.y = (int)gte_getDataReg(GTE_MAC2);
     o.z = (int)gte_getDataReg(GTE_MAC3);
     return o;
+}
+
+static bool AddTri(
+	const GTEVector16* tv0, const GTEVector16* tv1, const GTEVector16* tv2, 
+	uint32_t *ptr, 
+	DMAChain *chain, 
+	const Face *face
+)
+{
+	// apply perspective to computed tris
+	SetGtePosAndRot( 0, 0, 0, 0, 0, 0 );
+	gte_loadV0(tv0);
+	gte_loadV1(tv1);
+	gte_loadV2(tv2);
+	gte_command(GTE_CMD_RTPT | GTE_SF);
+	
+	//detect overflow
+	uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW
+	if(gte_flag)
+	{
+		return false;
+	}
+
+	// Determine the winding order of the vertices on screen. If they
+	// are ordered clockwise then the face is visible, otherwise it can
+	// be skipped as it is not facing the camera.
+	gte_command(GTE_CMD_NCLIP); 
+	int order = gte_getDataReg(GTE_MAC0);
+
+	if (order <= 0){return false;}
+	//if (order > 0){continue;}
+
+	// Save the first transformed vertex (the GTE only keeps the X/Y
+	// coordinates of the last 3 vertices processed and Z coordinates of
+	// the last 4 vertices processed) and apply projection to the last
+	// vertex.
+	uint32_t xy0 = gte_getDataReg(GTE_SXY0);
+
+	// Calculate the average Z coordinate of all vertices and use it to
+	// determine the ordering table bucket index for this face.
+	gte_command(GTE_CMD_AVSZ3 | GTE_SF);
+	int zIndex = gte_getDataReg(GTE_OTZ);
+	//see if flipping it helps?
+	//zIndex = (ORDERING_TABLE_SIZE - 1) - zIndex;
+	if ((zIndex < 0) || (zIndex >= ORDERING_TABLE_SIZE)) {return false;}
+
+	// Create a new tri and give its vertices the X/Y coordinates
+	// calculated by the GTE.
+	ptr    = allocatePacket(chain, zIndex, 4);
+	ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
+	//ptr[0] = face->color | gp0_triangle(false, false);
+	ptr[1] = xy0;
+	gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
+	gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
+	gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
 }
 
 #define SCREEN_WIDTH  320
@@ -224,9 +313,8 @@ int main(int argc, const char **argv) {
 		chain->nextPacket = chain->data;
 
 		frameCounter++;
-		int backFaceCnt = 0;
-		int gteErrorCnt = 0;
-		int allTooNearCnt = 0; // can add othre counters as needed
+		int allTooNearCnt = 0; // can add other counters as needed
+		int notGood = 0;
 		// Draw the cube one face at a time.
 		for (int i = 0; i < NUM_CUBE_FACES; i++) {
 			const Face *face = &cubeFaces[i];
@@ -238,90 +326,64 @@ int main(int argc, const char **argv) {
 			GTEVector16 tv2 = gte_mvmva_cam(&cubeVertices[face->vertices[2]]);
 			
 			//DEFINE NEAR PLANE
-			int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) //// SZ0/SZ1/SZ2 are the transformed depths
+			int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) // SZ0/SZ1/SZ2 are the transformed depths
 			int sz1 = tv1.z; //gte_getDataReg(GTE_SZ1)
 			int sz2 = tv2.z; //gte_getDataReg(GTE_SZ2)
 			//handle the near clip stuff, deal with off screen
+			bool wasCorrected = false; //marks if was corrected
 			if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
 			{
 				allTooNearCnt++;
 				continue;
 			}
-			else if (sz0 < NEAR_Z || sz1 < NEAR_Z || sz2 < NEAR_Z)
+			else if (sz0 < NEAR_Z)
 			{
-				if(sz0 < NEAR_Z && !(sz1 < NEAR_Z || sz2 < NEAR_Z)) //its sz0
+				if (sz1 < NEAR_Z) //sz1 and sz0
 				{
-
+					tv0 = IntersectNear(&tv2, &tv0, NEAR_Z);
+					tv1 = IntersectNear(&tv2, &tv1, NEAR_Z);
+					wasCorrected = true;
 				}
-				else if(sz1 < NEAR_Z && !(sz0 < NEAR_Z || sz2 < NEAR_Z)) //its sz1
+				else if (sz2 < NEAR_Z) //sz2 and sz0
 				{
-					
+					tv0 = IntersectNear(&tv1, &tv0, NEAR_Z);
+					tv2 = IntersectNear(&tv1, &tv2, NEAR_Z);
+					wasCorrected = true;
 				}
-				else if(sz2 < NEAR_Z && !(sz0 < NEAR_Z || sz1 < NEAR_Z)) //its sz2
+				else //just sz0
 				{
-					
-				}
-				else //at this point we know it has to be a two vert case
-				{
-					if(sz0 < NEAR_Z && sz1 < NEAR_Z) //sz0 and sz1
-					{
-						
-					}
-					else if(sz0 < NEAR_Z && sz2 < NEAR_Z) //sz0 and sz2
-					{
-						
-					}
-					else //has to be sz1 and sz2
-					{
-
-					}
+					GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
+					GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
+					if(!AddTri(&tv1,&tv2,&tv4,ptr,chain,face)){notGood++;}
+					if(!AddTri(&tv1,&tv3,&tv4,ptr,chain,face)){notGood++;}
 				}
 			}
+			else if (sz1 < NEAR_Z)
+			{
+				if (sz2 < NEAR_Z) //sz1 and sz2
+				{
+					tv1 = IntersectNear(&tv0, &tv1, NEAR_Z);
+					tv2 = IntersectNear(&tv0, &tv2, NEAR_Z);
+					wasCorrected = true;
+				}
+				else //just sz1
+				{
+					GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
+					GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
+					if(!AddTri(&tv0,&tv2,&tv4,ptr,chain,face)){notGood++;}
+					if(!AddTri(&tv0,&tv3,&tv4,ptr,chain,face)){notGood++;}
+				}
+			}
+			else if (sz2 < NEAR_Z) //we know because this is the 3rd check, only sz2
+			{
+				GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
+				GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
+				if(!AddTri(&tv0,&tv1,&tv4,ptr,chain,face)){notGood++;}
+				if(!AddTri(&tv0,&tv3,&tv4,ptr,chain,face)){notGood++;}
+			}
 
-			// apply perspective to computed tris
-			SetGtePosAndRot( 0, 0, 0, 0, 0, 0 );
-			gte_loadV0(&tv0);
-			gte_loadV1(&tv1);
-			gte_loadV2(&tv2);
-			gte_command(GTE_CMD_RTPT | GTE_SF);
-			
-			//detect overflow
-			uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW
-			if(gte_flag){gteErrorCnt++;continue;}
-
-			// Determine the winding order of the vertices on screen. If they
-			// are ordered clockwise then the face is visible, otherwise it can
-			// be skipped as it is not facing the camera.
-			gte_command(GTE_CMD_NCLIP); 
-			int order = gte_getDataReg(GTE_MAC0);
-
-			if (order <= 0){backFaceCnt++; continue;}
-			//if (order > 0){continue;}
-
-			// Save the first transformed vertex (the GTE only keeps the X/Y
-			// coordinates of the last 3 vertices processed and Z coordinates of
-			// the last 4 vertices processed) and apply projection to the last
-			// vertex.
-			uint32_t xy0 = gte_getDataReg(GTE_SXY0);
-
-
-			// Calculate the average Z coordinate of all vertices and use it to
-			// determine the ordering table bucket index for this face.
-			gte_command(GTE_CMD_AVSZ3 | GTE_SF);
-			int zIndex = gte_getDataReg(GTE_OTZ);
-			//see if flipping it helps?
-			//zIndex = (ORDERING_TABLE_SIZE - 1) - zIndex;
-			if ((zIndex < 0) || (zIndex >= ORDERING_TABLE_SIZE)) {continue;}
-
-			// Create a new tri and give its vertices the X/Y coordinates
-			// calculated by the GTE.
-			ptr    = allocatePacket(chain, zIndex, 4);
-			ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
-			//ptr[0] = face->color | gp0_triangle(false, false);
-			ptr[1] = xy0;
-			gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
-			gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
-			gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
+			//call add tri
+			if(!AddTri(&tv0,&tv1,&tv2,ptr,chain,face)){notGood++;}
 		}
 
 		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3);
@@ -341,7 +403,7 @@ int main(int argc, const char **argv) {
 		waitForGP0Ready();
 		waitForVSync();
 		sendLinkedList(&(chain->orderingTable)[ORDERING_TABLE_SIZE - 1]);
-		int c = (allTooNearCnt + backFaceCnt + gteErrorCnt);
+		int c = (allTooNearCnt + notGood);
 		if(c>10000){continue;}
 		printf("help");
 	}

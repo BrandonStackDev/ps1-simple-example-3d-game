@@ -65,7 +65,7 @@ typedef enum {
 	GTE_CMD_RTPT    = 48 <<  0, // Perspective transformation (3 vertices)
 	GTE_CMD_GPF     = 61 <<  0, // Linear interpolation
 	GTE_CMD_GPL     = 62 <<  0, // Linear interpolation with base
-	GTE_CMD_NCCT    = 63 <<  0, // Normal color color (3 vertices) ? repeat of GTE_CMD_BITMASK?, maybe bitmask isnt a command, its a mask? idk things
+	GTE_CMD_NCCT    = 63 <<  0, // Normal color color (3 vertices)
 	GTE_LM          =  1 << 10, // Saturate IR to 0x0000-0x7fff
 	GTE_CV_BITMASK  =  3 << 13,
 	GTE_CV_TR       =  0 << 13, // Use TR as translation vector for MVMVA

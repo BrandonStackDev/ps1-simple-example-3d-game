@@ -1,41 +1,3 @@
-/*
- * ps1-bare-metal - (C) 2023-2025 spicyjpeg
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
- * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * Having explored the capabilities of the PS1's GPU in previous examples, it is
- * now time to focus on the other piece of hardware that makes 3D graphics on
- * the PS1 possible: the geometry transformation engine (GTE), a specialized
- * coprocessor whose job is to perform various geometry-related calculations
- * much faster than the CPU could on its own. To draw a 3D scene the CPU can use
- * the GTE to calculate the screen space coordinates of each polygon's vertices,
- * then pack those into a display list which will be sent off to the GPU for
- * drawing. In this example we're going to draw a spinning model of a cube,
- * using the GTE to carry out the computationally heavy tasks of rotation and
- * perspective projection.
- *
- * Unlike any other peripheral on the console, the GTE is not memory-mapped
- * but rather accessed through special CPU instructions that require the use of
- * inline assembly. This tutorial will thus use the cop0.h and gte.h headers I
- * wrote to abstract away the low-level assembly required to access GTE
- * registers, focusing on its practical usage instead. This example may be
- * harder to follow compared to previous ones for people unfamiliar with basic
- * linear algebra and 3D geometry concepts, so familiarizing with those is
- * highly recommended.
- */
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -53,7 +15,7 @@
 // bits long). We'll define this unit value to make their handling easier.
 #define ONE (1 << 12)
 // pick a near plane in your units (tune this)
-#define NEAR_Z 32
+#define NEAR_Z 8
 
 static void setupGTE(int width, int height) {
 	// Ensure the GTE, which is coprocessor 2, is enabled. MIPS coprocessors are
@@ -210,9 +172,12 @@ static GTEVector16 gte_mvmva_cam(const GTEVector16* v)
 	gte_command(GTE_CMD_MVMVA | GTE_SF | GTE_MX_RT | GTE_V_V0 | GTE_CV_TR);
 
     GTEVector16 o;
-    o.x = (int)gte_getDataReg(GTE_MAC1);
-    o.y = (int)gte_getDataReg(GTE_MAC2);
-    o.z = (int)gte_getDataReg(GTE_MAC3);
+    // o.x = (int)gte_getDataReg(GTE_MAC1);
+    // o.y = (int)gte_getDataReg(GTE_MAC2);
+    // o.z = (int)gte_getDataReg(GTE_MAC3);
+	o.x = (int16_t)gte_getDataReg(GTE_IR1);
+    o.y = (int16_t)gte_getDataReg(GTE_IR2);
+    o.z = (int16_t)gte_getDataReg(GTE_IR3);
     return o;
 }
 
@@ -228,12 +193,14 @@ static bool AddTri(
 	gte_loadV0(tv0);
 	gte_loadV1(tv1);
 	gte_loadV2(tv2);
-	gte_command(GTE_CMD_RTPT | GTE_SF);
+	//gte_command(GTE_CMD_RTPT | GTE_SF );
+	gte_command(GTE_CMD_RTPT | GTE_SF | GTE_MX_RT | GTE_V_V0 | GTE_CV_TR);
 	
 	//detect overflow
 	uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW
-	if(gte_flag)
+	if((gte_flag & GTE_FLAG_DIVIDE_OVERFLOW) && (tv0->z < NEAR_Z || tv1->z < NEAR_Z || tv2->z < NEAR_Z))
 	{
+		printf("%d",gte_flag);
 		return false;
 	}
 
@@ -244,7 +211,6 @@ static bool AddTri(
 	int order = gte_getDataReg(GTE_MAC0);
 
 	if (order <= 0){return false;}
-	//if (order > 0){continue;}
 
 	// Save the first transformed vertex (the GTE only keeps the X/Y
 	// coordinates of the last 3 vertices processed and Z coordinates of
@@ -269,8 +235,10 @@ static bool AddTri(
 	gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
 	gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
 	gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
+	return true;
 }
 
+static int minZ =  999999, maxZ = -999999;
 #define SCREEN_WIDTH  320
 #define SCREEN_HEIGHT 240
 
@@ -315,8 +283,16 @@ int main(int argc, const char **argv) {
 		frameCounter++;
 		int allTooNearCnt = 0; // can add other counters as needed
 		int notGood = 0;
-		// Draw the cube one face at a time.
-		for (int i = 0; i < NUM_CUBE_FACES; i++) {
+		int notGood1 = 0;
+		int notGood2 = 0;
+		int notGood3 = 0;
+		int notGood4 = 0;
+		int notGood5 = 0;
+		int notGood6 = 0;
+		
+		// Draw the obj one face at a time.
+		for (int i = 0; i < NUM_CUBE_FACES; i++) 
+		{
 			const Face *face = &cubeFaces[i];
 			//initial set, was once per object, now is once per tri
 			SetGtePosAndRot( 0, 0, 64, 0, frameCounter * 8, frameCounter * 6 );
@@ -324,11 +300,20 @@ int main(int argc, const char **argv) {
 			GTEVector16 tv0 = gte_mvmva_cam(&cubeVertices[face->vertices[0]]);
 			GTEVector16 tv1 = gte_mvmva_cam(&cubeVertices[face->vertices[1]]);
 			GTEVector16 tv2 = gte_mvmva_cam(&cubeVertices[face->vertices[2]]);
+
+			// uint32_t f = (uint32_t)gte_getControlReg(GTE_FLAG); //this doesnt seem to ever trigger?
+			// if (f & GTE_FLAG_DIVIDE_OVERFLOW) {return false;}
 			
 			//DEFINE NEAR PLANE
 			int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) // SZ0/SZ1/SZ2 are the transformed depths
 			int sz1 = tv1.z; //gte_getDataReg(GTE_SZ1)
 			int sz2 = tv2.z; //gte_getDataReg(GTE_SZ2)
+			minZ = (tv0.z < minZ) ? tv0.z : minZ;
+			minZ = (tv1.z < minZ) ? tv1.z : minZ;
+			minZ = (tv2.z < minZ) ? tv2.z : minZ;
+			maxZ = (tv0.z > maxZ) ? tv0.z : maxZ;
+			maxZ = (tv1.z > maxZ) ? tv1.z : maxZ;
+			maxZ = (tv2.z > maxZ) ? tv2.z : maxZ;
 			//handle the near clip stuff, deal with off screen
 			bool wasCorrected = false; //marks if was corrected
 			if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
@@ -354,8 +339,9 @@ int main(int argc, const char **argv) {
 				{
 					GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
 					GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
-					if(!AddTri(&tv1,&tv2,&tv4,ptr,chain,face)){notGood++;}
-					if(!AddTri(&tv1,&tv3,&tv4,ptr,chain,face)){notGood++;}
+					if(!AddTri(&tv1,&tv2,&tv4,ptr,chain,face)){notGood1++;}
+					if(!AddTri(&tv1,&tv4,&tv3,ptr,chain,face)){notGood2++;}
+					continue;
 				}
 			}
 			else if (sz1 < NEAR_Z)
@@ -370,18 +356,19 @@ int main(int argc, const char **argv) {
 				{
 					GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
 					GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
-					if(!AddTri(&tv0,&tv2,&tv4,ptr,chain,face)){notGood++;}
-					if(!AddTri(&tv0,&tv3,&tv4,ptr,chain,face)){notGood++;}
+					if(!AddTri(&tv0,&tv2,&tv4,ptr,chain,face)){notGood3++;}
+					if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){notGood4++;}
+					continue;
 				}
 			}
 			else if (sz2 < NEAR_Z) //we know because this is the 3rd check, only sz2
 			{
 				GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
 				GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
-				if(!AddTri(&tv0,&tv1,&tv4,ptr,chain,face)){notGood++;}
-				if(!AddTri(&tv0,&tv3,&tv4,ptr,chain,face)){notGood++;}
+				if(!AddTri(&tv0,&tv1,&tv4,ptr,chain,face)){notGood5++;}
+				if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){notGood6++;}
+				continue;
 			}
-
 			//call add tri
 			if(!AddTri(&tv0,&tv1,&tv2,ptr,chain,face)){notGood++;}
 		}
@@ -403,7 +390,9 @@ int main(int argc, const char **argv) {
 		waitForGP0Ready();
 		waitForVSync();
 		sendLinkedList(&(chain->orderingTable)[ORDERING_TABLE_SIZE - 1]);
-		int c = (allTooNearCnt + notGood);
+		printf("Z range %d..%d\n", minZ, maxZ);
+		minZ =  999999; maxZ = -999999;
+		int c = (allTooNearCnt + notGood + notGood1 + notGood2 + notGood3 + notGood4 + notGood5 + notGood6);
 		if(c>10000){continue;}
 		printf("help");
 	}

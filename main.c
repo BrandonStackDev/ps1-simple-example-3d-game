@@ -15,7 +15,7 @@
 // bits long). We'll define this unit value to make their handling easier.
 #define ONE (1 << 12)
 // pick a near plane in your units (tune this)
-#define NEAR_Z 8
+#define NEAR_Z 32
 
 static void setupGTE(int width, int height) {
 	// Ensure the GTE, which is coprocessor 2, is enabled. MIPS coprocessors are
@@ -238,6 +238,96 @@ static bool AddTri(
 	return true;
 }
 
+static bool DrawObject(
+	DMAChain *chain, uint32_t *ptr,
+	int x, int y, int z, 
+	int yaw, int pitch, int roll, 
+	int numFaces, const Face *faces
+)
+{
+	// Draw the obj one face at a time.
+	for (int i = 0; i < numFaces; i++) 
+	{
+		const Face *face = &faces[i];
+		//initial set, was once per object, now is once per tri
+		SetGtePosAndRot( x, y, z, yaw, pitch, roll);
+		//initial tri work (no perspective because we dont want to risk overflow yet)
+		GTEVector16 tv0 = gte_mvmva_cam(&cubeVertices[face->vertices[0]]);
+		GTEVector16 tv1 = gte_mvmva_cam(&cubeVertices[face->vertices[1]]);
+		GTEVector16 tv2 = gte_mvmva_cam(&cubeVertices[face->vertices[2]]);
+
+		// uint32_t f = (uint32_t)gte_getControlReg(GTE_FLAG); //this doesnt seem to ever trigger?
+		// if (f & GTE_FLAG_DIVIDE_OVERFLOW) {return false;}
+		
+		//DEFINE NEAR PLANE
+		int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) // SZ0/SZ1/SZ2 are the transformed depths
+		int sz1 = tv1.z; //gte_getDataReg(GTE_SZ1)
+		int sz2 = tv2.z; //gte_getDataReg(GTE_SZ2)
+		// minZ = (tv0.z < minZ) ? tv0.z : minZ;
+		// minZ = (tv1.z < minZ) ? tv1.z : minZ;
+		// minZ = (tv2.z < minZ) ? tv2.z : minZ;
+		// maxZ = (tv0.z > maxZ) ? tv0.z : maxZ;
+		// maxZ = (tv1.z > maxZ) ? tv1.z : maxZ;
+		// maxZ = (tv2.z > maxZ) ? tv2.z : maxZ;
+		//handle the near clip stuff, deal with off screen
+		bool wasCorrected = false; //marks if was corrected
+		if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
+		{
+			continue;
+		}
+		else if (sz0 < NEAR_Z)
+		{
+			if (sz1 < NEAR_Z) //sz1 and sz0
+			{
+				tv0 = IntersectNear(&tv2, &tv0, NEAR_Z);
+				tv1 = IntersectNear(&tv2, &tv1, NEAR_Z);
+				wasCorrected = true;
+			}
+			else if (sz2 < NEAR_Z) //sz2 and sz0
+			{
+				tv0 = IntersectNear(&tv1, &tv0, NEAR_Z);
+				tv2 = IntersectNear(&tv1, &tv2, NEAR_Z);
+				wasCorrected = true;
+			}
+			else //just sz0
+			{
+				GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
+				GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
+				if(!AddTri(&tv1,&tv2,&tv4,ptr,chain,face)){}
+				if(!AddTri(&tv1,&tv4,&tv3,ptr,chain,face)){}
+				continue;
+			}
+		}
+		else if (sz1 < NEAR_Z)
+		{
+			if (sz2 < NEAR_Z) //sz1 and sz2
+			{
+				tv1 = IntersectNear(&tv0, &tv1, NEAR_Z);
+				tv2 = IntersectNear(&tv0, &tv2, NEAR_Z);
+				wasCorrected = true;
+			}
+			else //just sz1
+			{
+				GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
+				GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
+				if(!AddTri(&tv0,&tv2,&tv4,ptr,chain,face)){}
+				if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){}
+				continue;
+			}
+		}
+		else if (sz2 < NEAR_Z) //we know because this is the 3rd check, only sz2
+		{
+			GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
+			GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
+			if(!AddTri(&tv0,&tv1,&tv4,ptr,chain,face)){}
+			if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){}
+			continue;
+		}
+		//call add tri
+		if(!AddTri(&tv0,&tv1,&tv2,ptr,chain,face)){}
+	}
+}
+
 static int minZ =  999999, maxZ = -999999;
 #define SCREEN_WIDTH  320
 #define SCREEN_HEIGHT 240
@@ -282,97 +372,12 @@ int main(int argc, const char **argv) {
 
 		frameCounter++;
 		int allTooNearCnt = 0; // can add other counters as needed
-		int notGood = 0;
-		int notGood1 = 0;
-		int notGood2 = 0;
-		int notGood3 = 0;
-		int notGood4 = 0;
-		int notGood5 = 0;
-		int notGood6 = 0;
-		
-		// Draw the obj one face at a time.
-		for (int i = 0; i < NUM_CUBE_FACES; i++) 
-		{
-			const Face *face = &cubeFaces[i];
-			//initial set, was once per object, now is once per tri
-			SetGtePosAndRot( 0, 0, 64, 0, frameCounter * 8, frameCounter * 6 );
-			//initial tri work (no perspective because we dont want to risk overflow yet)
-			GTEVector16 tv0 = gte_mvmva_cam(&cubeVertices[face->vertices[0]]);
-			GTEVector16 tv1 = gte_mvmva_cam(&cubeVertices[face->vertices[1]]);
-			GTEVector16 tv2 = gte_mvmva_cam(&cubeVertices[face->vertices[2]]);
+		//draw the ground
+		DrawObject(chain, ptr, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces);
+		//draw the character
+		DrawObject(chain, ptr, 0,0,128, frameCounter/67, frameCounter*8, frameCounter*6, NUM_CUBE_FACES, cubeFaces);
 
-			// uint32_t f = (uint32_t)gte_getControlReg(GTE_FLAG); //this doesnt seem to ever trigger?
-			// if (f & GTE_FLAG_DIVIDE_OVERFLOW) {return false;}
-			
-			//DEFINE NEAR PLANE
-			int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) // SZ0/SZ1/SZ2 are the transformed depths
-			int sz1 = tv1.z; //gte_getDataReg(GTE_SZ1)
-			int sz2 = tv2.z; //gte_getDataReg(GTE_SZ2)
-			minZ = (tv0.z < minZ) ? tv0.z : minZ;
-			minZ = (tv1.z < minZ) ? tv1.z : minZ;
-			minZ = (tv2.z < minZ) ? tv2.z : minZ;
-			maxZ = (tv0.z > maxZ) ? tv0.z : maxZ;
-			maxZ = (tv1.z > maxZ) ? tv1.z : maxZ;
-			maxZ = (tv2.z > maxZ) ? tv2.z : maxZ;
-			//handle the near clip stuff, deal with off screen
-			bool wasCorrected = false; //marks if was corrected
-			if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
-			{
-				allTooNearCnt++;
-				continue;
-			}
-			else if (sz0 < NEAR_Z)
-			{
-				if (sz1 < NEAR_Z) //sz1 and sz0
-				{
-					tv0 = IntersectNear(&tv2, &tv0, NEAR_Z);
-					tv1 = IntersectNear(&tv2, &tv1, NEAR_Z);
-					wasCorrected = true;
-				}
-				else if (sz2 < NEAR_Z) //sz2 and sz0
-				{
-					tv0 = IntersectNear(&tv1, &tv0, NEAR_Z);
-					tv2 = IntersectNear(&tv1, &tv2, NEAR_Z);
-					wasCorrected = true;
-				}
-				else //just sz0
-				{
-					GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
-					GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
-					if(!AddTri(&tv1,&tv2,&tv4,ptr,chain,face)){notGood1++;}
-					if(!AddTri(&tv1,&tv4,&tv3,ptr,chain,face)){notGood2++;}
-					continue;
-				}
-			}
-			else if (sz1 < NEAR_Z)
-			{
-				if (sz2 < NEAR_Z) //sz1 and sz2
-				{
-					tv1 = IntersectNear(&tv0, &tv1, NEAR_Z);
-					tv2 = IntersectNear(&tv0, &tv2, NEAR_Z);
-					wasCorrected = true;
-				}
-				else //just sz1
-				{
-					GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
-					GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
-					if(!AddTri(&tv0,&tv2,&tv4,ptr,chain,face)){notGood3++;}
-					if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){notGood4++;}
-					continue;
-				}
-			}
-			else if (sz2 < NEAR_Z) //we know because this is the 3rd check, only sz2
-			{
-				GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
-				GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
-				if(!AddTri(&tv0,&tv1,&tv4,ptr,chain,face)){notGood5++;}
-				if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){notGood6++;}
-				continue;
-			}
-			//call add tri
-			if(!AddTri(&tv0,&tv1,&tv2,ptr,chain,face)){notGood++;}
-		}
-
+		//finalize
 		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3);
 		ptr[0] = gp0_rgb(64, 64, 64) | gp0_vramFill();
 		ptr[1] = gp0_xy(bufferX, bufferY);
@@ -392,7 +397,7 @@ int main(int argc, const char **argv) {
 		sendLinkedList(&(chain->orderingTable)[ORDERING_TABLE_SIZE - 1]);
 		printf("Z range %d..%d\n", minZ, maxZ);
 		minZ =  999999; maxZ = -999999;
-		int c = (allTooNearCnt + notGood + notGood1 + notGood2 + notGood3 + notGood4 + notGood5 + notGood6);
+		int c = (allTooNearCnt + 34);
 		if(c>10000){continue;}
 		printf("help");
 	}

@@ -2,7 +2,7 @@ import random;
 
 # this version is for tris
 
-a = open('char_01.obj','r')
+a = open('level_01.obj','r')
 b = a.read()
 a.close()
 
@@ -43,7 +43,7 @@ s = ''
 s+= 'static const GTEVector16 cubeVertices[NUM_CUBE_VERTICES] = {' + '\n'
 
 for x in v:
-    s+='    { .x = ' + str(int(float(x[0])*12)) + ', .y =  ' + str(int(float(x[1])*12)) + ', .z = ' + str(int(float(x[2])*-12)) + ' }, \n'
+    s+='    { .x = ' + str(int(float(x[0])*42)) + ', .y =  ' + str(int(float(x[1])*42)) + ', .z = ' + str(int(float(x[2])*-42)) + ' }, \n'
 s+= '};\n\n\n\n'
 
 s += ''

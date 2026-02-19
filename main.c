@@ -242,7 +242,7 @@ static bool DrawObject(
 	DMAChain *chain, uint32_t *ptr,
 	int x, int y, int z, 
 	int yaw, int pitch, int roll, 
-	int numFaces, const Face *faces
+	int numFaces, const Face *faces, const GTEVector16 *vertices
 )
 {
 	// Draw the obj one face at a time.
@@ -252,9 +252,9 @@ static bool DrawObject(
 		//initial set, was once per object, now is once per tri
 		SetGtePosAndRot( x, y, z, yaw, pitch, roll);
 		//initial tri work (no perspective because we dont want to risk overflow yet)
-		GTEVector16 tv0 = gte_mvmva_cam(&cubeVertices[face->vertices[0]]);
-		GTEVector16 tv1 = gte_mvmva_cam(&cubeVertices[face->vertices[1]]);
-		GTEVector16 tv2 = gte_mvmva_cam(&cubeVertices[face->vertices[2]]);
+		GTEVector16 tv0 = gte_mvmva_cam(&vertices[face->vertices[0]]);
+		GTEVector16 tv1 = gte_mvmva_cam(&vertices[face->vertices[1]]);
+		GTEVector16 tv2 = gte_mvmva_cam(&vertices[face->vertices[2]]);
 
 		// uint32_t f = (uint32_t)gte_getControlReg(GTE_FLAG); //this doesnt seem to ever trigger?
 		// if (f & GTE_FLAG_DIVIDE_OVERFLOW) {return false;}
@@ -373,9 +373,9 @@ int main(int argc, const char **argv) {
 		frameCounter++;
 		int allTooNearCnt = 0; // can add other counters as needed
 		//draw the ground
-		DrawObject(chain, ptr, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces);
+		DrawObject(chain, ptr, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces, groundVertices);
 		//draw the character
-		DrawObject(chain, ptr, 0,0,128, frameCounter/67, frameCounter*8, frameCounter*6, NUM_CUBE_FACES, cubeFaces);
+		DrawObject(chain, ptr, 0,0,64, frameCounter/67, frameCounter*8, frameCounter*6, NUM_CUBE_FACES, cubeFaces, cubeVertices);
 
 		//finalize
 		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3);

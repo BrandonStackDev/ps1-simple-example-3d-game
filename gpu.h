@@ -24,9 +24,11 @@
 // setupGTE() for more details. Higher values will take up more memory but are
 // required to render more complex scenes with wide depth ranges correctly.
 #define DMA_MAX_CHUNK_SIZE    16
-#define CHAIN_BUFFER_SIZE   1024
+#define CHAIN_BUFFER_SIZE   2048
 //#define ORDERING_TABLE_SIZE  240
-#define ORDERING_TABLE_SIZE  480
+//#define ORDERING_TABLE_SIZE  480
+//#define ORDERING_TABLE_SIZE  2048
+#define ORDERING_TABLE_SIZE  960
 
 typedef struct {
 	uint32_t data[CHAIN_BUFFER_SIZE];

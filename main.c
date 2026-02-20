@@ -255,20 +255,11 @@ static bool DrawObject(
 		GTEVector16 tv0 = gte_mvmva_cam(&vertices[face->vertices[0]]);
 		GTEVector16 tv1 = gte_mvmva_cam(&vertices[face->vertices[1]]);
 		GTEVector16 tv2 = gte_mvmva_cam(&vertices[face->vertices[2]]);
-
-		// uint32_t f = (uint32_t)gte_getControlReg(GTE_FLAG); //this doesnt seem to ever trigger?
-		// if (f & GTE_FLAG_DIVIDE_OVERFLOW) {return false;}
 		
 		//DEFINE NEAR PLANE
-		int sz0 = tv0.z; //gte_getDataReg(GTE_SZ0) // SZ0/SZ1/SZ2 are the transformed depths
-		int sz1 = tv1.z; //gte_getDataReg(GTE_SZ1)
-		int sz2 = tv2.z; //gte_getDataReg(GTE_SZ2)
-		// minZ = (tv0.z < minZ) ? tv0.z : minZ;
-		// minZ = (tv1.z < minZ) ? tv1.z : minZ;
-		// minZ = (tv2.z < minZ) ? tv2.z : minZ;
-		// maxZ = (tv0.z > maxZ) ? tv0.z : maxZ;
-		// maxZ = (tv1.z > maxZ) ? tv1.z : maxZ;
-		// maxZ = (tv2.z > maxZ) ? tv2.z : maxZ;
+		int sz0 = tv0.z;
+		int sz1 = tv1.z;
+		int sz2 = tv2.z;
 		//handle the near clip stuff, deal with off screen
 		bool wasCorrected = false; //marks if was corrected
 		if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
@@ -328,7 +319,6 @@ static bool DrawObject(
 	}
 }
 
-static int minZ =  999999, maxZ = -999999;
 #define SCREEN_WIDTH  320
 #define SCREEN_HEIGHT 240
 
@@ -356,7 +346,8 @@ int main(int argc, const char **argv) {
 	bool     usingSecondFrame = false;
 	int      frameCounter     = 0;
 
-	for (;;) {
+	while(true)
+	{
 		int bufferX = usingSecondFrame ? SCREEN_WIDTH : 0;
 		int bufferY = 0;
 
@@ -371,11 +362,10 @@ int main(int argc, const char **argv) {
 		chain->nextPacket = chain->data;
 
 		frameCounter++;
-		int allTooNearCnt = 0; // can add other counters as needed
 		//draw the ground
 		DrawObject(chain, ptr, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces, groundVertices);
 		//draw the character
-		DrawObject(chain, ptr, 0,0,64, frameCounter/67, frameCounter*8, frameCounter*6, NUM_CUBE_FACES, cubeFaces, cubeVertices);
+		DrawObject(chain, ptr, 0,0,128, 0, frameCounter*16, frameCounter*12, NUM_CUBE_FACES, cubeFaces, cubeVertices);
 
 		//finalize
 		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3);
@@ -386,20 +376,12 @@ int main(int argc, const char **argv) {
 		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 4);
 		ptr[0] = gp0_texpage(0, true, false);
 		ptr[1] = gp0_fbOffset1(bufferX, bufferY);
-		ptr[2] = gp0_fbOffset2(
-			bufferX + SCREEN_WIDTH  - 1,
-			bufferY + SCREEN_HEIGHT - 2
-		);
+		ptr[2] = gp0_fbOffset2( bufferX + SCREEN_WIDTH  - 1, bufferY + SCREEN_HEIGHT - 2 );
 		ptr[3] = gp0_fbOrigin(bufferX, bufferY);
 		
 		waitForGP0Ready();
 		waitForVSync();
 		sendLinkedList(&(chain->orderingTable)[ORDERING_TABLE_SIZE - 1]);
-		printf("Z range %d..%d\n", minZ, maxZ);
-		minZ =  999999; maxZ = -999999;
-		int c = (allTooNearCnt + 34);
-		if(c>10000){continue;}
-		printf("help");
 	}
 	return 0;
 }

@@ -37,19 +37,19 @@ for x in c:
 
 # for x in v: print(x)
 # for x in f: print(x)
+scale = 256
 
 s = ''
-
 s+= 'static const GTEVector16 cubeVertices[NUM_CUBE_VERTICES] = {' + '\n'
 
 for x in v:
-    s+='    { .x = ' + str(int(float(x[0])*42)) + ', .y =  ' + str(int(float(x[1])*42)) + ', .z = ' + str(int(float(x[2])*-42)) + ' }, \n'
+    s+='    { .x = ' + str(int(float(x[0])*-scale)) + ', .y =  ' + str(int(float(x[1])*-scale)) + ', .z = ' + str(int(float(x[2])*-scale)) + ' }, \n'
 s+= '};\n\n\n\n'
 
 s += ''
 s += ''
 s += 'static const Face cubeFaces[NUM_CUBE_FACES] = { \n'
-cl_store = 0x66aa11
+cl_store = 0x446600
 for x in f:
     #--//random.randrange(0x1000000):06x
     # cl_store += random.randrange(2)

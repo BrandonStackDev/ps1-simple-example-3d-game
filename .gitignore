@@ -60,6 +60,7 @@ build/*
 #text notes and stuff
 scratch.txt
 *code_out.txt
+notes.txt
 
 #vscode
 .vscode/*

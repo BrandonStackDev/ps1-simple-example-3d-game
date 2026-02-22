@@ -172,9 +172,6 @@ static GTEVector16 gte_mvmva_cam(const GTEVector16* v)
 	gte_command(GTE_CMD_MVMVA | GTE_SF | GTE_MX_RT | GTE_V_V0 | GTE_CV_TR);
 
     GTEVector16 o;
-    // o.x = (int)gte_getDataReg(GTE_MAC1);
-    // o.y = (int)gte_getDataReg(GTE_MAC2);
-    // o.z = (int)gte_getDataReg(GTE_MAC3);
 	o.x = (int16_t)gte_getDataReg(GTE_IR1);
     o.y = (int16_t)gte_getDataReg(GTE_IR2);
     o.z = (int16_t)gte_getDataReg(GTE_IR3);
@@ -183,9 +180,7 @@ static GTEVector16 gte_mvmva_cam(const GTEVector16* v)
 
 static bool AddTri(
 	const GTEVector16* tv0, const GTEVector16* tv1, const GTEVector16* tv2, 
-	uint32_t *ptr, 
-	DMAChain *chain, 
-	const Face *face
+	DMAChain *chain, const Face *face
 )
 {
 	// apply perspective to computed tris
@@ -194,7 +189,7 @@ static bool AddTri(
 	gte_loadV1(tv1);
 	gte_loadV2(tv2);
 	//gte_command(GTE_CMD_RTPT | GTE_SF );
-	gte_command(GTE_CMD_RTPT | GTE_SF | GTE_MX_RT | GTE_V_V0 | GTE_CV_TR);
+	gte_command(GTE_CMD_RTPT | GTE_SF);
 	
 	//detect overflow
 	uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW
@@ -228,7 +223,9 @@ static bool AddTri(
 
 	// Create a new tri and give its vertices the X/Y coordinates
 	// calculated by the GTE.
-	ptr    = allocatePacket(chain, zIndex, 4);
+	uint32_t *ptr;
+	ptr    = allocatePacket(chain, zIndex, 4, false);
+	if (!ptr){ return false; }
 	ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
 	//ptr[0] = face->color | gp0_triangle(false, false);
 	ptr[1] = xy0;
@@ -238,8 +235,8 @@ static bool AddTri(
 	return true;
 }
 
-static bool DrawObject(
-	DMAChain *chain, uint32_t *ptr,
+static void DrawObject(
+	DMAChain *chain,
 	int x, int y, int z, 
 	int yaw, int pitch, int roll, 
 	int numFaces, const Face *faces, const GTEVector16 *vertices
@@ -284,8 +281,8 @@ static bool DrawObject(
 			{
 				GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
 				GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
-				if(!AddTri(&tv1,&tv2,&tv4,ptr,chain,face)){}
-				if(!AddTri(&tv1,&tv4,&tv3,ptr,chain,face)){}
+				if(!AddTri(&tv1,&tv2,&tv4,chain,face)){}
+				if(!AddTri(&tv1,&tv4,&tv3,chain,face)){}
 				continue;
 			}
 		}
@@ -301,8 +298,8 @@ static bool DrawObject(
 			{
 				GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
 				GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
-				if(!AddTri(&tv0,&tv2,&tv4,ptr,chain,face)){}
-				if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){}
+				if(!AddTri(&tv0,&tv2,&tv4,chain,face)){}
+				if(!AddTri(&tv0,&tv4,&tv3,chain,face)){}
 				continue;
 			}
 		}
@@ -310,17 +307,38 @@ static bool DrawObject(
 		{
 			GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
 			GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
-			if(!AddTri(&tv0,&tv1,&tv4,ptr,chain,face)){}
-			if(!AddTri(&tv0,&tv4,&tv3,ptr,chain,face)){}
+			if(!AddTri(&tv0,&tv1,&tv4,chain,face)){}
+			if(!AddTri(&tv0,&tv4,&tv3,chain,face)){}
 			continue;
 		}
 		//call add tri
-		if(!AddTri(&tv0,&tv1,&tv2,ptr,chain,face)){}
+		if(!AddTri(&tv0,&tv1,&tv2,chain,face)){}
 	}
 }
 
 #define SCREEN_WIDTH  320
 #define SCREEN_HEIGHT 240
+
+static bool FinishDraw(DMAChain *chain, int bufferX, int bufferY)
+{
+	//finalize
+	uint32_t *ptr;
+	ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3, true);
+	if (!ptr){ return false; }
+	ptr[0] = gp0_rgb(64, 64, 64) | gp0_vramFill();
+	ptr[1] = gp0_xy(bufferX, bufferY);
+	ptr[2] = gp0_xy(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+	ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 4, true);
+	if (!ptr){ return false; }
+	ptr[0] = gp0_texpage(0, true, false);
+	ptr[1] = gp0_fbOffset1(bufferX, bufferY);
+	ptr[2] = gp0_fbOffset2( bufferX + SCREEN_WIDTH  - 1, bufferY + SCREEN_HEIGHT - 2 );
+	ptr[3] = gp0_fbOrigin(bufferX, bufferY);
+	return true;
+}
+
+
 
 int main(int argc, const char **argv) {
 	initSerialIO(115200);
@@ -354,34 +372,23 @@ int main(int argc, const char **argv) {
 		DMAChain *chain  = &dmaChains[usingSecondFrame];
 		usingSecondFrame = !usingSecondFrame;
 
-		uint32_t *ptr;
-
 		GPU_GP1 = gp1_fbOffset(bufferX, bufferY);
 
 		clearOrderingTable(chain->orderingTable, ORDERING_TABLE_SIZE);
 		chain->nextPacket = chain->data;
 
-		frameCounter++;
-		//draw the ground
-		DrawObject(chain, ptr, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces, groundVertices);
-		//draw the character
-		DrawObject(chain, ptr, 0,0,128, 0, frameCounter*16, frameCounter*12, NUM_CUBE_FACES, cubeFaces, cubeVertices);
-
-		//finalize
-		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3);
-		ptr[0] = gp0_rgb(64, 64, 64) | gp0_vramFill();
-		ptr[1] = gp0_xy(bufferX, bufferY);
-		ptr[2] = gp0_xy(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-		ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 4);
-		ptr[0] = gp0_texpage(0, true, false);
-		ptr[1] = gp0_fbOffset1(bufferX, bufferY);
-		ptr[2] = gp0_fbOffset2( bufferX + SCREEN_WIDTH  - 1, bufferY + SCREEN_HEIGHT - 2 );
-		ptr[3] = gp0_fbOrigin(bufferX, bufferY);
+		//will be a loop in the future over each object in the display arena
+			//draw the ground
+			DrawObject(chain, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces, groundVertices);
+			//draw the character
+			DrawObject(chain, 0,0,128, 0, frameCounter*16, frameCounter*12, NUM_CUBE_FACES, cubeFaces, cubeVertices);
+		//finish it up
+		FinishDraw(chain, bufferX, bufferY);
 		
 		waitForGP0Ready();
 		waitForVSync();
 		sendLinkedList(&(chain->orderingTable)[ORDERING_TABLE_SIZE - 1]);
+		frameCounter++;
 	}
 	return 0;
 }

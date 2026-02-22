@@ -121,19 +121,24 @@ void clearOrderingTable(uint32_t *table, int numEntries) {
 		__asm__ volatile("");
 }
 
-uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands) {
-	assert((numCommands >= 0) && (numCommands <= DMA_MAX_CHUNK_SIZE));
-	assert((zIndex      >= 0) && (zIndex      <  ORDERING_TABLE_SIZE));
+uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands, bool final) {
+    if ((numCommands < 0) || (numCommands > DMA_MAX_CHUNK_SIZE)) {return NULL;}
+    if ((zIndex < 0) || (zIndex >= ORDERING_TABLE_SIZE)) {return NULL;}
 
-	uint32_t *ptr      = chain->nextPacket;
-	chain->nextPacket += numCommands + 1;
+    // Need (numCommands + 1) words in chain->data
+	int space = final ? CHAIN_BUFFER_SIZE: CHAIN_BUFFER_SIZE-8 ;
+    if (chain->nextPacket + (numCommands + 1) > &(chain->data)[space]) //CHAIN_BUFFER_SIZE-8 here because we need room for the end of the commands to finalize the draw
+	{
+        return NULL; // out of space
+    }
 
-	*ptr = gp0_tag(numCommands, (void *) chain->orderingTable[zIndex]);
-	chain->orderingTable[zIndex] = gp0_tag(0, ptr);
+    uint32_t *ptr      = chain->nextPacket;
+    chain->nextPacket += numCommands + 1;
 
-	assert(chain->nextPacket < &(chain->data)[CHAIN_BUFFER_SIZE]);
+    *ptr = gp0_tag(numCommands, (void *) chain->orderingTable[zIndex]);
+    chain->orderingTable[zIndex] = gp0_tag(0, ptr);
 
-	return &ptr[1];
+    return &ptr[1];
 }
 
 void uploadTexture(

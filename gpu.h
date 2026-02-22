@@ -24,7 +24,7 @@
 // setupGTE() for more details. Higher values will take up more memory but are
 // required to render more complex scenes with wide depth ranges correctly.
 #define DMA_MAX_CHUNK_SIZE    16
-#define CHAIN_BUFFER_SIZE   2048
+#define CHAIN_BUFFER_SIZE   16384 //large,should be about 3276 tris
 //#define ORDERING_TABLE_SIZE  240
 //#define ORDERING_TABLE_SIZE  480
 //#define ORDERING_TABLE_SIZE  2048
@@ -60,7 +60,7 @@ void sendVRAMData(
 	int        height
 );
 void clearOrderingTable(uint32_t *table, int numEntries);
-uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands);
+uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands, bool final);
 
 void uploadTexture(
 	TextureInfo *info,

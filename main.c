@@ -14,8 +14,13 @@
 // fixed unit, in this case 4096 or 1 << 12 (hence making the fractional part 12
 // bits long). We'll define this unit value to make their handling easier.
 #define ONE (1 << 12)
-// pick a near plane in your units (tune this)
-#define NEAR_Z 32
+#define NEAR_Z 16
+
+typedef enum {
+	ADD_TRI_GOOD = 0,
+	ADD_TRI_BAD = 1,
+	ADD_TRI_CLIP = 2
+} AddTriResult;
 
 static void setupGTE(int width, int height) {
 	// Ensure the GTE, which is coprocessor 2, is enabled. MIPS coprocessors are
@@ -178,7 +183,7 @@ static GTEVector16 gte_mvmva_cam(const GTEVector16* v)
     return o;
 }
 
-static bool AddTri(
+static bool AddClippedTri(
 	const GTEVector16* tv0, const GTEVector16* tv1, const GTEVector16* tv2, 
 	DMAChain *chain, const Face *face
 )
@@ -195,7 +200,6 @@ static bool AddTri(
 	uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW
 	if((gte_flag & GTE_FLAG_DIVIDE_OVERFLOW) && (tv0->z < NEAR_Z || tv1->z < NEAR_Z || tv2->z < NEAR_Z))
 	{
-		printf("%d",gte_flag);
 		return false;
 	}
 
@@ -235,6 +239,69 @@ static bool AddTri(
 	return true;
 }
 
+/// @brief set obj matrix before call
+/// @param tv0 - triangle vector 0
+/// @param tv1 - triangle vector 1
+/// @param tv2 - triangle vector 2
+/// @param chain - the DMA chain pointer
+/// @param face - the triangle face pointer
+/// @return 
+static AddTriResult AddTri(
+	const GTEVector16* tv0, const GTEVector16* tv1, const GTEVector16* tv2, 
+	DMAChain *chain, const Face *face
+)
+{
+	// apply perspective to computed tris
+	//SetGtePosAndRot( 0, 0, 0, 0, 0, 0 ); // this function will not do this for you
+	gte_loadV0(tv0);
+	gte_loadV1(tv1);
+	gte_loadV2(tv2);
+	//gte_command(GTE_CMD_RTPT | GTE_SF );
+	gte_command(GTE_CMD_RTPT | GTE_SF);
+	
+	//detect overflow
+	uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW
+	if((gte_flag & GTE_FLAG_DIVIDE_OVERFLOW) && (tv0->z < NEAR_Z || tv1->z < NEAR_Z || tv2->z < NEAR_Z))
+	{
+		return ADD_TRI_CLIP;
+	}
+
+	// Determine the winding order of the vertices on screen. If they
+	// are ordered clockwise then the face is visible, otherwise it can
+	// be skipped as it is not facing the camera.
+	gte_command(GTE_CMD_NCLIP); 
+	int order = gte_getDataReg(GTE_MAC0);
+
+	if (order <= 0){return ADD_TRI_BAD;}
+
+	// Save the first transformed vertex (the GTE only keeps the X/Y
+	// coordinates of the last 3 vertices processed and Z coordinates of
+	// the last 4 vertices processed) and apply projection to the last
+	// vertex.
+	uint32_t xy0 = gte_getDataReg(GTE_SXY0);
+
+	// Calculate the average Z coordinate of all vertices and use it to
+	// determine the ordering table bucket index for this face.
+	gte_command(GTE_CMD_AVSZ3 | GTE_SF);
+	int zIndex = gte_getDataReg(GTE_OTZ);
+	//see if flipping it helps?
+	//zIndex = (ORDERING_TABLE_SIZE - 1) - zIndex;
+	if ((zIndex < 0) || (zIndex >= ORDERING_TABLE_SIZE)) {return ADD_TRI_BAD;}
+
+	// Create a new tri and give its vertices the X/Y coordinates
+	// calculated by the GTE.
+	uint32_t *ptr;
+	ptr    = allocatePacket(chain, zIndex, 4, false);
+	if (!ptr){ return ADD_TRI_BAD; }
+	ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
+	//ptr[0] = face->color | gp0_triangle(false, false);
+	ptr[1] = xy0;
+	gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
+	gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
+	gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
+	return ADD_TRI_GOOD;
+}
+
 static void DrawObject(
 	DMAChain *chain,
 	int x, int y, int z, 
@@ -242,77 +309,82 @@ static void DrawObject(
 	int numFaces, const Face *faces, const GTEVector16 *vertices
 )
 {
+	//set the matrix, initial
+	SetGtePosAndRot( x, y, z, yaw, pitch, roll);
 	// Draw the obj one face at a time.
 	for (int i = 0; i < numFaces; i++) 
 	{
 		const Face *face = &faces[i];
-		//initial set, was once per object, now is once per tri
-		SetGtePosAndRot( x, y, z, yaw, pitch, roll);
-		//initial tri work (no perspective because we dont want to risk overflow yet)
-		GTEVector16 tv0 = gte_mvmva_cam(&vertices[face->vertices[0]]);
-		GTEVector16 tv1 = gte_mvmva_cam(&vertices[face->vertices[1]]);
-		GTEVector16 tv2 = gte_mvmva_cam(&vertices[face->vertices[2]]);
-		
-		//DEFINE NEAR PLANE
-		int sz0 = tv0.z;
-		int sz1 = tv1.z;
-		int sz2 = tv2.z;
-		//handle the near clip stuff, deal with off screen
-		bool wasCorrected = false; //marks if was corrected
-		if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
+		AddTriResult res = AddTri(&vertices[face->vertices[0]],&vertices[face->vertices[1]],&vertices[face->vertices[2]],chain, face);
+		if(res==ADD_TRI_CLIP) //handle clipping of near plane
 		{
-			continue;
-		}
-		else if (sz0 < NEAR_Z)
-		{
-			if (sz1 < NEAR_Z) //sz1 and sz0
+			//initial tri work (no perspective because we dont want to risk overflow yet)
+			GTEVector16 tv0 = gte_mvmva_cam(&vertices[face->vertices[0]]);
+			GTEVector16 tv1 = gte_mvmva_cam(&vertices[face->vertices[1]]);
+			GTEVector16 tv2 = gte_mvmva_cam(&vertices[face->vertices[2]]);
+			
+			//DEFINE NEAR PLANE
+			int sz0 = tv0.z;
+			int sz1 = tv1.z;
+			int sz2 = tv2.z;
+			//handle the near clip stuff, deal with off screen
+			bool wasCorrected = false; //marks if was corrected
+			if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 
 			{
-				tv0 = IntersectNear(&tv2, &tv0, NEAR_Z);
-				tv1 = IntersectNear(&tv2, &tv1, NEAR_Z);
-				wasCorrected = true;
-			}
-			else if (sz2 < NEAR_Z) //sz2 and sz0
-			{
-				tv0 = IntersectNear(&tv1, &tv0, NEAR_Z);
-				tv2 = IntersectNear(&tv1, &tv2, NEAR_Z);
-				wasCorrected = true;
-			}
-			else //just sz0
-			{
-				GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
-				GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
-				if(!AddTri(&tv1,&tv2,&tv4,chain,face)){}
-				if(!AddTri(&tv1,&tv4,&tv3,chain,face)){}
 				continue;
 			}
-		}
-		else if (sz1 < NEAR_Z)
-		{
-			if (sz2 < NEAR_Z) //sz1 and sz2
+			else if (sz0 < NEAR_Z)
 			{
-				tv1 = IntersectNear(&tv0, &tv1, NEAR_Z);
-				tv2 = IntersectNear(&tv0, &tv2, NEAR_Z);
-				wasCorrected = true;
+				if (sz1 < NEAR_Z) //sz1 and sz0
+				{
+					tv0 = IntersectNear(&tv2, &tv0, NEAR_Z);
+					tv1 = IntersectNear(&tv2, &tv1, NEAR_Z);
+					wasCorrected = true;
+				}
+				else if (sz2 < NEAR_Z) //sz2 and sz0
+				{
+					tv0 = IntersectNear(&tv1, &tv0, NEAR_Z);
+					tv2 = IntersectNear(&tv1, &tv2, NEAR_Z);
+					wasCorrected = true;
+				}
+				else //just sz0
+				{
+					GTEVector16 tv3 = IntersectNear(&tv1, &tv0, NEAR_Z);
+					GTEVector16 tv4 = IntersectNear(&tv2, &tv0, NEAR_Z);
+					if(!AddClippedTri(&tv1,&tv2,&tv4,chain,face)){}
+					if(!AddClippedTri(&tv1,&tv4,&tv3,chain,face)){}
+					continue;
+				}
 			}
-			else //just sz1
+			else if (sz1 < NEAR_Z)
 			{
-				GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
-				GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
-				if(!AddTri(&tv0,&tv2,&tv4,chain,face)){}
-				if(!AddTri(&tv0,&tv4,&tv3,chain,face)){}
+				if (sz2 < NEAR_Z) //sz1 and sz2
+				{
+					tv1 = IntersectNear(&tv0, &tv1, NEAR_Z);
+					tv2 = IntersectNear(&tv0, &tv2, NEAR_Z);
+					wasCorrected = true;
+				}
+				else //just sz1
+				{
+					GTEVector16 tv3 = IntersectNear(&tv0, &tv1, NEAR_Z);
+					GTEVector16 tv4 = IntersectNear(&tv2, &tv1, NEAR_Z);
+					if(!AddClippedTri(&tv0,&tv2,&tv4,chain,face)){}
+					if(!AddClippedTri(&tv0,&tv4,&tv3,chain,face)){}
+					continue;
+				}
+			}
+			else if (sz2 < NEAR_Z) //we know because this is the 3rd check, only sz2
+			{
+				GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
+				GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
+				if(!AddClippedTri(&tv0,&tv1,&tv4,chain,face)){}
+				if(!AddClippedTri(&tv0,&tv4,&tv3,chain,face)){}
 				continue;
 			}
+			//call add tri
+			if(!AddClippedTri(&tv0,&tv1,&tv2,chain,face)){}
+			SetGtePosAndRot( x, y, z, yaw, pitch, roll); // prepare for next tri, this way I dont have to store which needs clipped and handle later
 		}
-		else if (sz2 < NEAR_Z) //we know because this is the 3rd check, only sz2
-		{
-			GTEVector16 tv3 = IntersectNear(&tv0, &tv2, NEAR_Z);
-			GTEVector16 tv4 = IntersectNear(&tv1, &tv2, NEAR_Z);
-			if(!AddTri(&tv0,&tv1,&tv4,chain,face)){}
-			if(!AddTri(&tv0,&tv4,&tv3,chain,face)){}
-			continue;
-		}
-		//call add tri
-		if(!AddTri(&tv0,&tv1,&tv2,chain,face)){}
 	}
 }
 
@@ -381,7 +453,7 @@ int main(int argc, const char **argv) {
 			//draw the ground
 			DrawObject(chain, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces, groundVertices);
 			//draw the character
-			DrawObject(chain, 0,0,128, 0, frameCounter*16, frameCounter*12, NUM_CUBE_FACES, cubeFaces, cubeVertices);
+			DrawObject(chain, 0,0,128, 0, frameCounter*32, frameCounter*16, NUM_CUBE_FACES, cubeFaces, cubeVertices);
 		//finish it up
 		FinishDraw(chain, bufferX, bufferY);
 		

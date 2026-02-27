@@ -17,7 +17,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "ps1/gpucmd.h"
+#include "../ps1/gpucmd.h"
 
 // In order for Z averaging to work properly, ORDERING_TABLE_SIZE should be set
 // to either a relatively high value (1024 or more) or a multiple of 12; see

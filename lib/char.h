@@ -2,10 +2,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "gpu.h"
-#include "ps1/cop0.h"
-#include "ps1/gpucmd.h"
-#include "ps1/gte.h"
-#include "ps1/registers.h"
+#include "../ps1/cop0.h"
+#include "../ps1/gpucmd.h"
+#include "../ps1/gte.h"
+#include "../ps1/registers.h"
 #include "trig.h"
 
 // We're going to store the 3D model of our cube as two separate arrays, one

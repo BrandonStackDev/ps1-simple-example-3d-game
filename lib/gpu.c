@@ -18,8 +18,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "gpu.h"
-#include "ps1/gpucmd.h"
-#include "ps1/registers.h"
+#include "../ps1/gpucmd.h"
+#include "../ps1/registers.h"
 
 void setupGPU(GP1VideoMode mode, int width, int height) {
 	int x = 0x760;

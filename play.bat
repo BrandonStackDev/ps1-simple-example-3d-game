@@ -1,0 +1,1 @@
+pcsx-redux -run -stdout -logfile build\log.txt -exe build\game.psexe

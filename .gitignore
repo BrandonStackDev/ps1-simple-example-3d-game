@@ -64,3 +64,6 @@ notes.txt
 
 #vscode
 .vscode/*
+
+#sentry?
+.sentry-native

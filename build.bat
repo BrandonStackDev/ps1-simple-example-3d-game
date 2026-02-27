@@ -46,3 +46,8 @@ python "tools\convertExecutable.py" build\game.elf build\game.psexe
 if errorlevel 1 exit /b 1
 
 echo OK: build\game.psexe
+
+@REM REM convert to iso also, not ready yet
+@REM exe2iso build\game.psexe -o build\game.bin
+
+@REM echo Created ISO

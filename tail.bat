@@ -4,4 +4,4 @@
 @REM better than nuffin' right?
 @REM if you install nmap for windows you get ncat, linux just use nc or ncat
 
-ncat localhost 3001 -w 60
+ncat localhost 3001

@@ -84,5 +84,3 @@ Also, i have something like this in my .vscode\c_cpp_properties.json for intelli
 ```
 
 to build just call "build" from cmd in the project folder
-
-if you add any .c files be sure to edit the bat script, they need to go into the sources.rsp file (I am not clever enough to do it automatically in cmd, also, cmd is the worst shell language by far, I have ever come across; If shell scripting is one of Microsoft's love languages, then they are all full of hate...just saying)

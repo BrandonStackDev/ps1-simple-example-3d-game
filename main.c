@@ -9,12 +9,15 @@
 #include "lib/trig.h"
 #include "lib/char.h"
 #include "lib/draw.h"
+#include "lib/pad.h"
 
 
-
-int main(int argc, const char **argv) {
+int main(int argc, const char **argv) 
+{
 	initSerialIO(115200);
-
+	initControllerBus();
+	printf("start...\n");
+	
 	if ((GPU_GP1 & GP1_STAT_FB_MODE_BITMASK) == GP1_STAT_FB_MODE_PAL) {
 		puts("Using PAL mode");
 		setupGPU(GP1_MODE_PAL, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -38,6 +41,7 @@ int main(int argc, const char **argv) {
 
 	while(true)
 	{
+		//prep for next draw
 		int bufferX = usingSecondFrame ? SCREEN_WIDTH : 0;
 		int bufferY = 0;
 
@@ -48,7 +52,22 @@ int main(int argc, const char **argv) {
 
 		clearOrderingTable(chain->orderingTable, ORDERING_TABLE_SIZE);
 		chain->nextPacket = chain->data;
-
+		//gather user input
+		// Poll both controller ports once per frame. Memory cards are ignored
+		// in this example.
+		for (int i = 0; i < 2; i++) 
+		{
+			LogControllerInfo(i);
+			PlayerInput in = GetControllerInput(i);
+			printf("%d \n", in.cross);
+			if(in.analog_on)
+			{
+				printf("%d \n", in.left_x);
+				printf("%d \n", in.left_y);
+				printf("%d \n", in.right_x);
+				printf("%d \n", in.right_y);
+			}
+		}
 		//will be a loop in the future over each object in the display arena
 			//draw the ground
 			DrawObject(chain, 0,0,0, 0,0,0, NUM_GROUND_FACES, groundFaces, groundVertices);

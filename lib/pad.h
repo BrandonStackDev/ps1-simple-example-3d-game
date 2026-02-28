@@ -301,18 +301,16 @@ static void LogControllerInfo(int port) {
 	}
 
 	ptr += sprintf(ptr, "\n  Response data:\t");
-
 	for (int i = 0; i < respLength; i++)
 	{
 		ptr += sprintf(ptr, "%02X ", response[i]);
 	}
-
 	if(anyButt){printf("\n%s \n\n", output);}
 }
 
 typedef struct {
 	bool connected; //is the controller connected
-	char type;
+	uint8_t type;
 	bool type_ok;
 	bool select; // 	"Select",   // Bit  0
 	bool L3;// "L3",       // Bit  1
@@ -331,17 +329,17 @@ typedef struct {
 	bool cross;// "X",        // Bit 14
 	bool square;// "Square"    // Bit 15
 	bool analog_on; // do we have joysticks
-	char analog_lv; //left stick vertical direction
-	char analog_lh; //left stick horizontal direction
-	char analog_rv; // right stick vertical
-	char analog_rh; //right stick horizontal
+	uint8_t analog_lv; //left stick vertical direction
+	uint8_t analog_lh; //left stick horizontal direction
+	uint8_t analog_rv; // right stick vertical
+	uint8_t analog_rh; //right stick horizontal
 	//these guys are the analog stick values but not the raw chars, 
 	//80 is center, so this will be the value 
 	// - 80 so its centered at 0 and goes negative
-	short left_x; //left stick vertical direction, adjusted //todo: probably a better choice than short, like signed 8bit int...?
-	short left_y; //left stick horizontal direction, adjusted
-	short right_x; // right stick vertical, adjusted
-	short right_y; //right stick horizontal, adjusted
+	int16_t left_x; //left stick vertical direction, adjusted //todo: probably a better choice than short, like signed 8bit int...?
+	int16_t left_y; //left stick horizontal direction, adjusted
+	int16_t right_x; // right stick vertical, adjusted
+	int16_t right_y; //right stick horizontal, adjusted
 } PlayerInput;
 
 //todo, how to handle players holding and releasing actions?
@@ -396,22 +394,22 @@ static PlayerInput GetControllerInput(int port)
 
 	uint16_t buttons = (response[2] | (response[3] << 8)) ^ 0xffff;
 
-	if ((buttons >> CB_SELECT) & 1){input.select = true;} // 	CB_SELECT = 0,
-	if ((buttons >> CB_L3) & 1){input.L3 = true;}// CB_L3,
-	if ((buttons >> CB_R3) & 1){input.R3 = true;}// CB_R3,
-	if ((buttons >> CB_START) & 1){input.start = true;}// CB_START,
-	if ((buttons >> CB_UP) & 1){input.up = true;}// CB_UP,
-	if ((buttons >> CB_RIGHT) & 1){input.right = true;}// CB_RIGHT,
-	if ((buttons >> CB_DOWN) & 1){input.down = true;}// CB_DOWN,
-	if ((buttons >> CB_LEFT) & 1){input.left = true;}// CB_LEFT,
-	if ((buttons >> CB_L2) & 1){input.L2 = true;}// CB_L2,
-	if ((buttons >> CB_R2) & 1){input.R2 = true;}// CB_R2,
-	if ((buttons >> CB_L1) & 1){input.L1 = true;}// CB_L1,
-	if ((buttons >> CB_R1) & 1){input.R1 = true;}// CB_R1,
-	if ((buttons >> CB_TRIANGLE) & 1){input.triangle = true;}// CB_TRIANGLE,
-	if ((buttons >> CB_CIRCLE) & 1){input.circle = true;}// CB_CIRCLE,
-	if ((buttons >> CB_CROSS) & 1){input.cross = true;}// CB_CROSS,
-	if ((buttons >> CB_SQUARE) & 1){input.square = true;}// CB_SQUARE
+	if ((buttons >> CB_SELECT	) & 1){input.select 	= true;} // CB_SELECT = 0
+	if ((buttons >> CB_L3		) & 1){input.L3 		= true;} // CB_L3 = 1
+	if ((buttons >> CB_R3		) & 1){input.R3 		= true;} // CB_R3 = 2
+	if ((buttons >> CB_START	) & 1){input.start 		= true;} // CB_START
+	if ((buttons >> CB_UP		) & 1){input.up 		= true;} // CB_UP
+	if ((buttons >> CB_RIGHT	) & 1){input.right 		= true;} // CB_RIGHT
+	if ((buttons >> CB_DOWN		) & 1){input.down 		= true;} // CB_DOWN
+	if ((buttons >> CB_LEFT		) & 1){input.left 		= true;} // CB_LEFT
+	if ((buttons >> CB_L2		) & 1){input.L2 		= true;} // CB_L2
+	if ((buttons >> CB_R2		) & 1){input.R2 		= true;} // CB_R2
+	if ((buttons >> CB_L1		) & 1){input.L1 		= true;} // CB_L1
+	if ((buttons >> CB_R1		) & 1){input.R1 		= true;} // CB_R1
+	if ((buttons >> CB_TRIANGLE	) & 1){input.triangle 	= true;} // CB_TRIANGLE
+	if ((buttons >> CB_CIRCLE	) & 1){input.circle 	= true;} // CB_CIRCLE
+	if ((buttons >> CB_CROSS	) & 1){input.cross 		= true;} // CB_CROSS = 14
+	if ((buttons >> CB_SQUARE	) & 1){input.square 	= true;} // CB_SQUARE = 15
 
 	if(respLength == 8) //todo: do we need this to be locked to controller type also?
 	{
@@ -420,10 +418,10 @@ static PlayerInput GetControllerInput(int port)
 		input.analog_rv = response[5];
 		input.analog_lh = response[6];
 		input.analog_lv = response[7];
-		input.left_x = 0x80 - input.analog_lh;
-		input.left_y = 0x80 - input.analog_lv;
-		input.right_x = 0x80 - input.analog_rh;
-		input.right_y = 0x80 - input.analog_rv;
+		input.left_x =  (int16_t)input.analog_lh - 0x80;
+		input.left_y =  0x80 - (int16_t)input.analog_lv;
+		input.right_x = (int16_t)input.analog_rh - 0x80;
+		input.right_y = 0x80 - (int16_t)input.analog_rv;
 	}
 	else
 	{

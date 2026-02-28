@@ -59,8 +59,7 @@ int main(int argc, const char **argv)
 		{
 			LogControllerInfo(i);
 			PlayerInput in = GetControllerInput(i);
-			printf("%d \n", in.cross);
-			if(in.analog_on)
+			if(in.analog_on && in.cross)
 			{
 				printf("%d \n", in.left_x);
 				printf("%d \n", in.left_y);

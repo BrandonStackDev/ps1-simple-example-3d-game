@@ -301,26 +301,54 @@ static AddTriResult AddTri(
 	return ADD_TRI_GOOD;
 }
 
-static void DrawObject(
-	DMAChain *chain,
+typedef struct {
+	int x; int y; int z; 
+	int yaw; int pitch; int roll; 
+	int numFaces;
+	const Face *faces;
+	int numVerts; //TODO: I didnt need this early on, if its wasteful, remove
+	const GTEVector16 *vertices;
+} DrawObj;
+
+static DrawObj CreateDrawObj(
 	int x, int y, int z, 
 	int yaw, int pitch, int roll, 
-	int numFaces, const Face *faces, const GTEVector16 *vertices
+	int numFaces, const Face *faces, 
+	int numVerts, const GTEVector16 *vertices
+)
+{
+	DrawObj obj = {0};
+	obj.x = x;
+	obj.y = y;
+	obj.z = z;
+	obj.yaw = yaw;
+	obj.pitch = pitch;
+	obj.roll = roll;
+	obj.numFaces = numFaces;
+	obj.faces = faces;
+	obj.numVerts = numVerts;
+	obj.vertices = vertices;
+	return obj;
+}
+
+static void DrawObject(
+	DMAChain *chain,
+	DrawObj *obj
 )
 {
 	//set the matrix, initial
-	SetGtePosAndRot( x, y, z, yaw, pitch, roll);
+	SetGtePosAndRot( obj->x, obj->y, obj->z, obj->yaw, obj->pitch, obj->roll);
 	// Draw the obj one face at a time.
-	for (int i = 0; i < numFaces; i++) 
+	for (int i = 0; i < obj->numFaces; i++) 
 	{
-		const Face *face = &faces[i];
-		AddTriResult res = AddTri(&vertices[face->vertices[0]],&vertices[face->vertices[1]],&vertices[face->vertices[2]],chain, face);
+		const Face *face = &(obj->faces)[i];
+		AddTriResult res = AddTri(&(obj->vertices)[face->vertices[0]],&(obj->vertices)[face->vertices[1]],&(obj->vertices)[face->vertices[2]],chain, face);
 		if(res==ADD_TRI_CLIP) //handle clipping of near plane
 		{
 			//initial tri work (no perspective because we dont want to risk overflow yet)
-			GTEVector16 tv0 = gte_mvmva_cam(&vertices[face->vertices[0]]);
-			GTEVector16 tv1 = gte_mvmva_cam(&vertices[face->vertices[1]]);
-			GTEVector16 tv2 = gte_mvmva_cam(&vertices[face->vertices[2]]);
+			GTEVector16 tv0 = gte_mvmva_cam(&(obj->vertices)[face->vertices[0]]);
+			GTEVector16 tv1 = gte_mvmva_cam(&(obj->vertices)[face->vertices[1]]);
+			GTEVector16 tv2 = gte_mvmva_cam(&(obj->vertices)[face->vertices[2]]);
 			
 			//DEFINE NEAR PLANE
 			int sz0 = tv0.z;
@@ -382,7 +410,8 @@ static void DrawObject(
 			}
 			//call add tri
 			if(!AddClippedTri(&tv0,&tv1,&tv2,chain,face)){}
-			SetGtePosAndRot( x, y, z, yaw, pitch, roll); // prepare for next tri, this way I dont have to store which needs clipped and handle later
+			// prepare for next tri, this way I dont have to store which needs clipped and handle later
+			SetGtePosAndRot( obj->x, obj->y, obj->z, obj->yaw, obj->pitch, obj->roll);
 		}
 	}
 }

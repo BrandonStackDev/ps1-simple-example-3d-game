@@ -49,8 +49,8 @@ int main(int argc, const char **argv)
 	//create drawable player object
 	DrawObj playerObj = CreateDrawObj(
 		0,0,128, 0,0,0, 
-		NUM_PLAYER_FACES, cubeFaces, 
-		NUM_PLAYER_VERTICES, cubeVertices
+		NUM_PLAYER_FACES, playerFaces, 
+		NUM_PLAYER_VERTICES, playerVertices
 	);
 
 	while(true)

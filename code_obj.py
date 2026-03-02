@@ -1,8 +1,22 @@
 import random;
+import argparse;
 
+#crete the parser
+parser = argparse.ArgumentParser(description="Parse Obj Files and spit out new file for PS1 draw objects.")
+
+# Positional argument (required)
+parser.add_argument("input", help="Input file path")
+parser.add_argument("scale", help="scale factor")
+
+# Optional flags
+parser.add_argument("-o", "--output", default="code_out.txt", help="Output file path")
+
+args = parser.parse_args()
+in_path = args.input
+out_path = args.output
+scale = float(args.scale)
 # this version is for tris
-
-a = open('level_01.obj','r')
+a = open(in_path,'r')
 b = a.read()
 a.close()
 
@@ -37,7 +51,6 @@ for x in c:
 
 # for x in v: print(x)
 # for x in f: print(x)
-scale = 256
 
 s = ''
 s+= 'static const GTEVector16 cubeVertices[NUM_CUBE_VERTICES] = {' + '\n'
@@ -63,7 +76,7 @@ s+= '};\n'
 print(len(v))
 print(len(f))
 
-a = open('code_out.txt','w')
+a = open(out_path,'w')
 a.write(s)
 a.close()
 

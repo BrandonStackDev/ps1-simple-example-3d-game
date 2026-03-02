@@ -257,6 +257,7 @@ static AddTriResult AddTri(
 	gte_loadV2(tv2);
 	//gte_command(GTE_CMD_RTPT | GTE_SF );
 	gte_command(GTE_CMD_RTPT | GTE_SF);
+	//gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition; //todo: need something weith the camera in mind?
 	
 	//detect overflow
 	uint32_t gte_flag = (uint32_t)gte_getControlReg(GTE_FLAG); //GTE_FLAG_DIVIDE_OVERFLOW

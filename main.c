@@ -14,9 +14,11 @@
 
 int main(int argc, const char **argv) 
 {
+	//init stuff
 	initSerialIO(115200);
 	initControllerBus();
 	
+	//setup gpu
 	if ((GPU_GP1 & GP1_STAT_FB_MODE_BITMASK) == GP1_STAT_FB_MODE_PAL)
 	{
 		puts("Using PAL mode");
@@ -28,8 +30,10 @@ int main(int argc, const char **argv)
 		setupGPU(GP1_MODE_NTSC, SCREEN_WIDTH, SCREEN_HEIGHT);
 	}
 
+	//setup gte
 	setupGTE(SCREEN_WIDTH, SCREEN_HEIGHT);
 
+	//setup dma chain and double buffer
 	DMA_DPCR |= 0
 		| DMA_DPCR_CH_ENABLE(DMA_GPU)
 		| DMA_DPCR_CH_ENABLE(DMA_OTC);
@@ -40,13 +44,16 @@ int main(int argc, const char **argv)
 	DMAChain dmaChains[2];
 	bool     usingSecondFrame = false;
 
-	//create drawable ground object
+	//create draw stuff
+	Camera camera = {0};
+	// - first camera
+	// - create drawable ground object
 	DrawObj groundObj = CreateDrawObj(
 		0,0,0, 0,0,0, 
 		NUM_GROUND_FACES, groundFaces, 
 		NUM_GROUND_VERTICES, groundVertices
 	);
-	//create drawable player object
+	// - create drawable player object
 	DrawObj playerObj = CreateDrawObj(
 		0,0,128, 0,0,0, 
 		NUM_PLAYER_FACES, playerFaces, 
@@ -69,16 +76,25 @@ int main(int argc, const char **argv)
 
 		//gather user input
 		PlayerInput in = GetControllerInput(PLAYER_ONE);
+		// - player
 		if(in.up){playerObj.z+=1;}
 		if(in.down){playerObj.z-=1;}
 		if(in.right){playerObj.x+=1;}
 		if(in.left){playerObj.x-=1;}
+		// - cam
+		if(in.L1){camera.yaw-=8;}
+		if(in.R1){camera.yaw+=8;}
+		//set camera
+		camera.x = playerObj.x + ((icos(camera.yaw) * CAMERA_DIST_RADIUS) >> 12);
+		camera.z = playerObj.z - ((isin(camera.yaw) * CAMERA_DIST_RADIUS) >> 12);
+		camera.y = playerObj.y + 64;   // some height
+		camera.pitch = -128;           //small negative pitch to look down
 
 		//will be a loop in the future over each object in the display arena
 			//draw the ground
-			DrawObject(chain, &groundObj);
+			DrawObject(chain, &groundObj, &camera);
 			//draw the character
-			DrawObject(chain, &playerObj);
+			DrawObject(chain, &playerObj, &camera);
 		//finish it up
 		FinishDraw(chain, bufferX, bufferY);
 		

@@ -2,12 +2,14 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "gpu.h"
+#include "trig.h"
 #include "../ps1/cop0.h"
 #include "../ps1/gpucmd.h"
 #include "../ps1/gte.h"
 #include "../ps1/registers.h"
-#include "trig.h"
 
+#define ENABLE_Z_CLIP false
+#define CAMERA_DIST_RADIUS 256
 // The GTE uses a 20.12 fixed-point format for most values. What this means is
 // that fractional values will be stored as integers by multiplying them by a
 // fixed unit, in this case 4096 or 1 << 12 (hence making the fractional part 12
@@ -15,11 +17,47 @@
 #define ONE (1 << 12)
 #define NEAR_Z 16
 
+
 typedef enum {
 	ADD_TRI_GOOD = 0,
 	ADD_TRI_BAD = 1,
 	ADD_TRI_CLIP = 2
 } AddTriResult;
+
+typedef struct {
+    int x, y, z;        // world position
+    int yaw, pitch;     // camera orientation
+} Camera;
+
+typedef struct {
+	int x; int y; int z; 
+	int yaw; int pitch; int roll; 
+	int numFaces;
+	const Face *faces;
+	int numVerts; //TODO: I didnt need this early on, if its wasteful, remove
+	const GTEVector16 *vertices;
+} DrawObj;
+
+static DrawObj CreateDrawObj(
+	int x, int y, int z, 
+	int yaw, int pitch, int roll, 
+	int numFaces, const Face *faces, 
+	int numVerts, const GTEVector16 *vertices
+)
+{
+	DrawObj obj = {0};
+	obj.x = x;
+	obj.y = y;
+	obj.z = z;
+	obj.yaw = yaw;
+	obj.pitch = pitch;
+	obj.roll = roll;
+	obj.numFaces = numFaces;
+	obj.faces = faces;
+	obj.numVerts = numVerts;
+	obj.vertices = vertices;
+	return obj;
+}
 
 static void setupGTE(int width, int height) {
 	// Ensure the GTE, which is coprocessor 2, is enabled. MIPS coprocessors are
@@ -134,6 +172,42 @@ static void SetGtePosAndRot(int x, int y, int z, int yaw, int pitch, int roll)
 			  0,   0, ONE
 		);
 		rotateCurrentMatrix(yaw, pitch, roll);
+}
+
+// Build view+model into GTE for this object
+static void SetGteViewAndModel(const Camera* cam, const DrawObj* obj)
+{
+    // 1) Start from identity
+    gte_setRotationMatrix(
+        ONE, 0,   0,
+        0,   ONE, 0,
+        0,   0,   ONE
+    );
+
+    // 2) Apply VIEW rotation = inverse of camera rotation
+    //    (world rotates opposite the camera)
+    rotateCurrentMatrix(-cam->yaw, -cam->pitch, 0);
+
+    // 3) Compute T = R_view * (P_obj - C)
+    GTEVector16 diff;
+    diff.x = (int16_t)(obj->x - cam->x);
+    diff.y = (int16_t)(obj->y - cam->y);
+    diff.z = (int16_t)(obj->z - cam->z);
+    diff._padding = 0;
+
+    gte_loadV0(&diff);
+    gte_command(GTE_CMD_MVMVA | GTE_SF | GTE_MX_RT | GTE_V_V0 | GTE_CV_NONE);
+
+    int offx = (int16_t)gte_getDataReg(GTE_IR1);
+    int offy = (int16_t)gte_getDataReg(GTE_IR2);
+    int offz = (int16_t)gte_getDataReg(GTE_IR3);
+
+    gte_setControlReg(GTE_TRX, offx);
+    gte_setControlReg(GTE_TRY, offy);
+    gte_setControlReg(GTE_TRZ, offz);
+
+    // 4) Now apply OBJECT rotation, giving R = R_view * R_obj
+    rotateCurrentMatrix(obj->yaw, obj->pitch, obj->roll);
 }
 
 static inline int clampi(int v, int lo, int hi)
@@ -302,49 +376,21 @@ static AddTriResult AddTri(
 	return ADD_TRI_GOOD;
 }
 
-typedef struct {
-	int x; int y; int z; 
-	int yaw; int pitch; int roll; 
-	int numFaces;
-	const Face *faces;
-	int numVerts; //TODO: I didnt need this early on, if its wasteful, remove
-	const GTEVector16 *vertices;
-} DrawObj;
-
-static DrawObj CreateDrawObj(
-	int x, int y, int z, 
-	int yaw, int pitch, int roll, 
-	int numFaces, const Face *faces, 
-	int numVerts, const GTEVector16 *vertices
-)
-{
-	DrawObj obj = {0};
-	obj.x = x;
-	obj.y = y;
-	obj.z = z;
-	obj.yaw = yaw;
-	obj.pitch = pitch;
-	obj.roll = roll;
-	obj.numFaces = numFaces;
-	obj.faces = faces;
-	obj.numVerts = numVerts;
-	obj.vertices = vertices;
-	return obj;
-}
-
 static void DrawObject(
 	DMAChain *chain,
-	DrawObj *obj
+	const DrawObj *obj,
+	const Camera *camera
 )
 {
 	//set the matrix, initial
-	SetGtePosAndRot( obj->x, obj->y, obj->z, obj->yaw, obj->pitch, obj->roll);
+	//SetGtePosAndRot( obj->x, obj->y, obj->z, obj->yaw, obj->pitch, obj->roll);
+	SetGteViewAndModel(camera, obj);
 	// Draw the obj one face at a time.
 	for (int i = 0; i < obj->numFaces; i++) 
 	{
 		const Face *face = &(obj->faces)[i];
 		AddTriResult res = AddTri(&(obj->vertices)[face->vertices[0]],&(obj->vertices)[face->vertices[1]],&(obj->vertices)[face->vertices[2]],chain, face);
-		if(res==ADD_TRI_CLIP) //handle clipping of near plane
+		if(ENABLE_Z_CLIP && res==ADD_TRI_CLIP) //handle clipping of near plane
 		{
 			//initial tri work (no perspective because we dont want to risk overflow yet)
 			GTEVector16 tv0 = gte_mvmva_cam(&(obj->vertices)[face->vertices[0]]);

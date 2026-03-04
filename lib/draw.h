@@ -119,21 +119,10 @@ static void rotateCurrentMatrix(int yaw, int pitch, int roll) {
 	// For each axis, compute the rotation matrix then "combine" it with the
 	// GTE's current matrix by multiplying the two and writing the result back
 	// to the GTE's registers.
+	//Adjusted based on observation, yaw -> roll, pitch -> yaw, roll -> pitch
 	if (yaw) {
 		s = isin(yaw);
 		c = icos(yaw);
-
-		gte_setColumnVectors(
-			c, -s,   0,
-			s,  c,   0,
-			0,  0, ONE
-		);
-		multiplyCurrentMatrixByVectors(&multiplied);
-		gte_loadRotationMatrix(&multiplied);
-	}
-	if (pitch) {
-		s = isin(pitch);
-		c = icos(pitch);
 
 		gte_setColumnVectors(
 			 c,   0, s,
@@ -143,14 +132,26 @@ static void rotateCurrentMatrix(int yaw, int pitch, int roll) {
 		multiplyCurrentMatrixByVectors(&multiplied);
 		gte_loadRotationMatrix(&multiplied);
 	}
-	if (roll) {
-		s = isin(roll);
-		c = icos(roll);
+	if (pitch) {
+		s = isin(pitch);
+		c = icos(pitch);
 
 		gte_setColumnVectors(
 			ONE, 0,  0,
 			  0, c, -s,
 			  0, s,  c
+		);
+		multiplyCurrentMatrixByVectors(&multiplied);
+		gte_loadRotationMatrix(&multiplied);
+	}
+	if (roll) {
+		s = isin(roll);
+		c = icos(roll);
+
+		gte_setColumnVectors(
+			c, -s,   0,
+			s,  c,   0,
+			0,  0, ONE
 		);
 		multiplyCurrentMatrixByVectors(&multiplied);
 		gte_loadRotationMatrix(&multiplied);

@@ -20,7 +20,10 @@
  *     https://www.coranac.com/2009/07/sines
  */
 
+ #include <stdint.h>
+ #include <stdbool.h>
 #include "trig.h"
+
 
 #define A (1 << 12)
 #define B 19900
@@ -54,4 +57,52 @@ int isin2(int x) {
 	y     = A - (x * y >> 16);
 
 	return (c >= 0) ? y : (-y);
+}
+
+/// @brief compute index (bucket given quadrant is divided into 32s) 
+///      - in quadrant from abs values of x and y (++ quad)
+/// @param x 
+/// @param y 
+/// @return 0-32
+uint8_t compute_index(int16_t x, int16_t y)
+{
+	if(y==0)		{return 0;}
+	else if(x==0)	{return 32;}
+	int i = 0;
+	int r = 0;
+	if(x > y)
+	{
+		int _y = y << 12;
+		r = _y/x;
+	}
+	else
+	{
+		int _x = x << 12;
+		r = _x/y;
+		i=16;
+	}
+	if(r>3737)		{return 16;}
+	else if(r>2221)	{return i+=((r/267)+2);}
+	else 			{return i+=(r/202);}
+	return i;
+}
+
+/// @brief arctan from x and y values
+/// @param x 
+/// @param y 
+/// @return returns angle in range 0-4095 where 2048 is PI
+int16_t atan2(int16_t x, int16_t y)
+{
+	int16_t rtn = 0;
+	bool xwn = x < 0; //x was negative
+	bool ywn = y < 0; //y was negative
+	int16_t _x = xwn ? -x: x; //abs x
+	int16_t _y = ywn ? -y: y; //abs y
+	//compute index, swap rolls if x xor y was negative
+	uint8_t i = xwn^ywn ? compute_index(_y,_x) : compute_index(_x,_y);
+	if(xwn && !ywn) 		{rtn = (i << 5) + 1024;} 	//-+ quad, i * 32; << 5 is same
+	else if(xwn && ywn) 	{rtn = (i << 5) + 2048;} 	//-- quad
+	else if(!xwn && ywn) 	{rtn = (i << 5) + 3072;} 	//+- quad
+	else  					{rtn = (i << 5);} 			//++ quad
+	return rtn%4096; //make sure its in range
 }

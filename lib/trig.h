@@ -14,6 +14,8 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdint.h>
+
 #pragma once
 
 #define ISIN_SHIFT  10
@@ -34,6 +36,8 @@ static inline int icos(int x) {
 static inline int icos2(int x) {
 	return isin2(x + (1 << ISIN2_SHIFT));
 }
+
+int16_t atan2(int16_t x, int16_t y);
 
 #ifdef __cplusplus
 }

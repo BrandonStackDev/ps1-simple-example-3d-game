@@ -82,13 +82,27 @@ int main(int argc, const char **argv)
 		if(in.right){playerObj.x+=1;}
 		if(in.left){playerObj.x-=1;}
 		// - cam
-		if(in.L1){camera.yaw-=8;}
-		if(in.R1){camera.yaw+=8;}
+		if(in.L1){camera.orbit_yaw-=8;}
+		if(in.R1){camera.orbit_yaw+=8;}
+		if(in.L2){camera.pitch+=8;}
+		if(in.R2){camera.pitch-=8;}
 		//set camera
-		camera.x = playerObj.x + ((icos(camera.yaw) * CAMERA_DIST_RADIUS) >> 12);
-		camera.z = playerObj.z - ((isin(camera.yaw) * CAMERA_DIST_RADIUS) >> 12);
+		int16_t rise = isin(camera.orbit_yaw);
+		int16_t run = icos(camera.orbit_yaw);
+		//fixed point math, bit shift after multiply for better precision, 
+		// - 12 bits because 2048 = PI 
+		// - and 1 on unit circle is 4096
+		camera.x = playerObj.x + ((run * CAMERA_DIST_RADIUS) >> 12); 
+		camera.z = playerObj.z - ((rise * CAMERA_DIST_RADIUS) >> 12);
 		camera.y = playerObj.y + 64;   // some height
-		camera.pitch = -128;           //small negative pitch to look down
+		// - example from donogan, player is target, pos is camera pos
+		// 		float dxT = b->targetPos.x - b->pos.x;
+		// 		float dzT = b->targetPos.z - b->pos.z;
+		//		float yawToTarget = (RAD2DEG * atan2f(dxT, dzT));
+		int16_t dx = playerObj.x - camera.x;
+		int16_t dz = playerObj.z - camera.z;
+		camera.yaw = atan2(dx,dz);
+
 
 		//will be a loop in the future over each object in the display arena
 			//draw the ground

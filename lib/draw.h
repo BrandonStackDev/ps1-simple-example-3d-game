@@ -25,24 +25,25 @@ typedef enum {
 } AddTriResult;
 
 typedef struct {
-    int x, y, z;        // world position
-    int yaw, pitch;     // camera orientation
+    int16_t x, y, z;        // world position
+    int16_t yaw, pitch;     // camera orientation
+	int16_t orbit_yaw;      //position around player
 } Camera;
 
 typedef struct {
-	int x; int y; int z; 
-	int yaw; int pitch; int roll; 
-	int numFaces;
+	int16_t x, y, z; 
+	int16_t yaw, pitch, roll; 
+	uint16_t numFaces;
 	const Face *faces;
-	int numVerts; //TODO: I didnt need this early on, if its wasteful, remove
+	uint16_t numVerts; //TODO: I didnt need this early on, if its wasteful, remove
 	const GTEVector16 *vertices;
 } DrawObj;
 
 static DrawObj CreateDrawObj(
-	int x, int y, int z, 
-	int yaw, int pitch, int roll, 
-	int numFaces, const Face *faces, 
-	int numVerts, const GTEVector16 *vertices
+	int16_t x, int16_t y, int16_t z, 
+	int16_t yaw, int16_t pitch, int16_t roll, 
+	uint16_t numFaces, const Face *faces, 
+	uint16_t numVerts, const GTEVector16 *vertices
 )
 {
 	DrawObj obj = {0};
@@ -399,9 +400,9 @@ static void DrawObject(
 			GTEVector16 tv2 = gte_mvmva_cam(&(obj->vertices)[face->vertices[2]]);
 			
 			//DEFINE NEAR PLANE
-			int sz0 = tv0.z;
-			int sz1 = tv1.z;
-			int sz2 = tv2.z;
+			int16_t sz0 = tv0.z;
+			int16_t sz1 = tv1.z;
+			int16_t sz2 = tv2.z;
 			//handle the near clip stuff, deal with off screen
 			bool wasCorrected = false; //marks if was corrected
 			if (sz0 < NEAR_Z && sz1 < NEAR_Z && sz2 < NEAR_Z) 

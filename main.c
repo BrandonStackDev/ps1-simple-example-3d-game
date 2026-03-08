@@ -101,7 +101,7 @@ int main(int argc, const char **argv)
 		//		float yawToTarget = (RAD2DEG * atan2f(dxT, dzT));
 		int16_t dx = playerObj.x - camera.x;
 		int16_t dz = playerObj.z - camera.z;
-		camera.yaw = 1024+atan2(dx,dz);
+		camera.yaw = atan2(dx,dz);
 
 
 		//will be a loop in the future over each object in the display arena

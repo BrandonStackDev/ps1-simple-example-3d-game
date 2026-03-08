@@ -37,7 +37,7 @@ static inline int icos2(int x) {
 	return isin2(x + (1 << ISIN2_SHIFT));
 }
 
-int16_t atan2(int16_t x, int16_t y);
+int16_t atan2(int16_t y, int16_t x);
 
 #ifdef __cplusplus
 }

@@ -89,10 +89,10 @@ uint8_t compute_index(int16_t x, int16_t y)
 }
 
 /// @brief arctan from x and y values
-/// @param x 
 /// @param y 
+/// @param x 
 /// @return returns angle in range 0-4095 where 2048 is PI
-int16_t atan2(int16_t x, int16_t y)
+int16_t atan2(int16_t y, int16_t x)
 {
 	int16_t rtn = 0;
 	bool xwn = x < 0; //x was negative
@@ -105,5 +105,5 @@ int16_t atan2(int16_t x, int16_t y)
 	else if(xwn && ywn) 	{rtn = (i << 5) + 2048;} 	//-- quad
 	else if(!xwn && ywn) 	{rtn = (i << 5) + 3072;} 	//+- quad
 	else  					{rtn = (i << 5);} 			//++ quad
-	return (4096-rtn)%4096; //make sure its in range, and reverse (idk why reverse, but that seems to work?)
+	return rtn%4096; //make sure its in range
 }

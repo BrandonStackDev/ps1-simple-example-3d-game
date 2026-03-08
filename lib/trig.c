@@ -86,7 +86,6 @@ uint8_t compute_index(int16_t x, int16_t y)
 		else if(r>2221)	{return 29-(r/267);}
 		else 			{return 31-(r/202);}
 	}
-	
 }
 
 /// @brief arctan from x and y values
@@ -106,5 +105,5 @@ int16_t atan2(int16_t x, int16_t y)
 	else if(xwn && ywn) 	{rtn = (i << 5) + 2048;} 	//-- quad
 	else if(!xwn && ywn) 	{rtn = (i << 5) + 3072;} 	//+- quad
 	else  					{rtn = (i << 5);} 			//++ quad
-	return rtn%4096; //make sure its in range
+	return (4096-rtn)%4096; //make sure its in range, and reverse (idk why reverse, but that seems to work?)
 }

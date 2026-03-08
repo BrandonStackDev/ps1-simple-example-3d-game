@@ -94,14 +94,14 @@ int main(int argc, const char **argv)
 		// - and 1 on unit circle is 4096
 		camera.x = playerObj.x + ((run * CAMERA_DIST_RADIUS) >> 12); 
 		camera.z = playerObj.z - ((rise * CAMERA_DIST_RADIUS) >> 12);
-		camera.y = playerObj.y + 64;   // some height
+		camera.y = playerObj.y;   // some height
 		// - example from donogan, player is target, pos is camera pos
 		// 		float dxT = b->targetPos.x - b->pos.x;
 		// 		float dzT = b->targetPos.z - b->pos.z;
 		//		float yawToTarget = (RAD2DEG * atan2f(dxT, dzT));
 		int16_t dx = playerObj.x - camera.x;
 		int16_t dz = playerObj.z - camera.z;
-		camera.yaw = atan2(dx,dz);
+		camera.yaw = 1024+atan2(dx,dz);
 
 
 		//will be a loop in the future over each object in the display arena

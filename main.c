@@ -10,37 +10,14 @@
 #include "lib/char.h"
 #include "lib/draw.h"
 #include "lib/pad.h"
+#include "lib/setup.h"
 
 
 int main(int argc, const char **argv) 
 {
-	//init stuff
-	initSerialIO(115200);
-	initControllerBus();
-	
-	//setup gpu
-	if ((GPU_GP1 & GP1_STAT_FB_MODE_BITMASK) == GP1_STAT_FB_MODE_PAL)
-	{
-		puts("Using PAL mode");
-		setupGPU(GP1_MODE_PAL, SCREEN_WIDTH, SCREEN_HEIGHT);
-	} 
-	else 
-	{
-		puts("Using NTSC mode");
-		setupGPU(GP1_MODE_NTSC, SCREEN_WIDTH, SCREEN_HEIGHT);
-	}
-
-	//setup gte
-	setupGTE(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-	//setup dma chain and double buffer
-	DMA_DPCR |= 0
-		| DMA_DPCR_CH_ENABLE(DMA_GPU)
-		| DMA_DPCR_CH_ENABLE(DMA_OTC);
-
-	GPU_GP1 = gp1_dmaRequestMode(GP1_DREQ_GP0_WRITE);
-	GPU_GP1 = gp1_dispBlank(false);
-
+	//set up gpu and gte and serial and controller and everything
+	GeneralSetup();
+	//create dma chains/buffers
 	DMAChain dmaChains[2];
 	bool     usingSecondFrame = false;
 

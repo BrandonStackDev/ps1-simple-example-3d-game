@@ -6,6 +6,8 @@
 #include "../ps1/gpucmd.h"
 #include "../ps1/registers.h"
 
+#pragma once
+
 static void delayMicroseconds(int time) {
 	// Calculate the approximate number of CPU cycles that need to be burned,
 	// assuming a 33.8688 MHz clock (1 us = 33.8688 = ~33.875 = 271 / 8 cycles).

@@ -8,6 +8,8 @@
 #include "../ps1/registers.h"
 #include "trig.h"
 
+#pragma once
+
 // We're going to store the 3D model of our cube as two separate arrays, one
 // containing a list of unique vertices and the other referencing those vertices
 // to build up quadrilateral faces. This approach of having a "palette" of

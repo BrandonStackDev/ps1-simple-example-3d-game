@@ -8,6 +8,8 @@
 #include "../ps1/gte.h"
 #include "../ps1/registers.h"
 
+#pragma once
+
 #define ENABLE_Z_CLIP false
 #define CAMERA_DIST_RADIUS 256
 // The GTE uses a 20.12 fixed-point format for most values. What this means is

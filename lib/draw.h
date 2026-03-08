@@ -19,6 +19,43 @@
 #define ONE (1 << 12)
 #define NEAR_Z 16
 
+//based on raylib math
+typedef struct {
+    int32_t x;
+    int32_t y;
+    int32_t z;
+    int32_t w;
+} Quat;
+
+Quat QuatMult(Quat q1, Quat q2)
+{
+    Quat result = { 0 };
+
+    int qax = q1.x, qay = q1.y, qaz = q1.z, qaw = q1.w;
+    int qbx = q2.x, qby = q2.y, qbz = q2.z, qbw = q2.w;
+
+    result.x = (qax*qbw + qaw*qbx + qay*qbz - qaz*qby) >> 12; //each component is in fixed point space, but after a multiply that doubles, so shift back down
+    result.y = (qay*qbw + qaw*qby + qaz*qbx - qax*qbz) >> 12;
+    result.z = (qaz*qbw + qaw*qbz + qax*qby - qay*qbx) >> 12;
+    result.w = (qaw*qbw - qax*qbx - qay*qby - qaz*qbz) >> 12;
+
+    return result;
+}
+
+static Quat QuatRot(int yaw, int pitch, int roll)
+{
+	int ySin = isin(yaw >> 1);
+    int yCos = icos(yaw >> 1);
+	int pSin = isin(pitch >> 1);
+    int pCos = icos(pitch >> 1);
+	int rSin = isin(roll >> 1);
+    int rCos = icos(roll >> 1);
+	Quat yQuat = { 0, ySin, 0, yCos };
+	Quat pQuat = { pSin, 0, 0, pCos };
+	Quat rQuat = { 0, 0, rSin, rCos };
+	Quat q = QuatMult(yQuat, QuatMult(pQuat, rQuat));
+	return q;
+}
 
 typedef enum {
 	ADD_TRI_GOOD = 0,
@@ -115,6 +152,38 @@ static void multiplyCurrentMatrixByVectors(GTEMatrix *output) {
 	output->values[2][2] = gte_getDataReg(GTE_IR3);
 }
 
+static void SetMatrixFromQuatRot(Quat q)
+{
+	int a2 = (q.x*q.x) >> 12; //rescale back to single fixed point space
+    int b2 = (q.y*q.y) >> 12;
+    int c2 = (q.z*q.z) >> 12;
+    int ac = (q.x*q.z) >> 12;
+    int ab = (q.x*q.y) >> 12;
+    int bc = (q.y*q.z) >> 12;
+    int ad = (q.w*q.x) >> 12;
+    int bd = (q.w*q.y) >> 12;
+    int cd = (q.w*q.z) >> 12;
+
+	//todo: rewrite the 2* as << 1
+    int m0 = ONE - 2*(b2 + c2);
+    int m1 = 2*(ab + cd);
+    int m2 = 2*(ac - bd);
+
+    int m4 = 2*(ab - cd);
+    int m5 = ONE - 2*(a2 + c2);
+    int m6 = 2*(bc + ad);
+
+    int m8 = 2*(ac + bd);
+    int m9 = 2*(bc - ad);
+    int m10 = ONE - 2*(a2 + b2);
+	gte_setColumnVectors
+	(
+		m0, m1, m2,
+		m4, m5, m6,
+		m8, m9, m10
+	);
+}
+
 static void rotateCurrentMatrix(int yaw, int pitch, int roll) {
 	static GTEMatrix multiplied;
 	int s, c;
@@ -181,6 +250,7 @@ static void SetGtePosAndRot(int x, int y, int z, int yaw, int pitch, int roll)
 // Build view+model into GTE for this object
 static void SetGteViewAndModel(const Camera* cam, const DrawObj* obj)
 {
+	//todo: replace this with quat version
     // 1) Start from identity
     gte_setRotationMatrix(
         ONE, 0,   0,
@@ -191,6 +261,12 @@ static void SetGteViewAndModel(const Camera* cam, const DrawObj* obj)
     // 2) Apply VIEW rotation = inverse of camera rotation
     //    (world rotates opposite the camera)
     rotateCurrentMatrix(-cam->yaw, -cam->pitch, 0);
+
+	//quat version for camera gimble lock fix...
+	// //1) create view quaterion
+	// Quat rot = QuatRot(-cam->yaw, -cam->pitch, 0);
+	// //2) set view rot matrix
+	// SetMatrixFromQuatRot(rot);
 
     // 3) Compute T = R_view * (P_obj - C)
     GTEVector16 diff;
@@ -393,7 +469,7 @@ static void DrawObject(
 	for (int i = 0; i < obj->numFaces; i++) 
 	{
 		const Face *face = &(obj->faces)[i];
-		AddTriResult res = AddTri(&(obj->vertices)[face->vertices[0]],&(obj->vertices)[face->vertices[1]],&(obj->vertices)[face->vertices[2]],chain, face);
+		AddTriResult res = AddTri(&(obj->vertices)[face->vertices[0]],&(obj->vertices)[face->vertices[1]],&(obj->vertices)[face->vertices[2]], chain, face);
 		if(ENABLE_Z_CLIP && res==ADD_TRI_CLIP) //handle clipping of near plane
 		{
 			//initial tri work (no perspective because we dont want to risk overflow yet)

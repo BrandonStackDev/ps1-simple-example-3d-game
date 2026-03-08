@@ -23,6 +23,7 @@ int main(int argc, const char **argv)
 
 	//create draw stuff
 	Camera camera = {0};
+	camera.pitch = -128;
 	// - first camera
 	// - create drawable ground object
 	DrawObj groundObj = CreateDrawObj(
@@ -71,7 +72,7 @@ int main(int argc, const char **argv)
 		// - and 1 on unit circle is 4096
 		camera.x = playerObj.x + ((run * CAMERA_DIST_RADIUS) >> 12); 
 		camera.z = playerObj.z - ((rise * CAMERA_DIST_RADIUS) >> 12);
-		camera.y = playerObj.y;   // some height
+		camera.y = playerObj.y + -(CAMERA_DIST_RADIUS >> 1);   // some height, y is inverted?
 		// - example from donogan, player is target, pos is camera pos
 		// 		float dxT = b->targetPos.x - b->pos.x;
 		// 		float dzT = b->targetPos.z - b->pos.z;

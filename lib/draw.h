@@ -165,18 +165,17 @@ static void SetMatrixFromQuatRot(Quat q)
     int bd = (q.w*q.y) >> 12;
     int cd = (q.w*q.z) >> 12;
 
-	//todo: rewrite the 2* as << 1
-    int m0 = ONE - 2*(b2 + c2);
-    int m1 = 2*(ab + cd);
-    int m2 = 2*(ac - bd);
+    int m0 = ONE - ((b2 + c2) << 1);
+    int m1 = (ab + cd) << 1;
+    int m2 = (ac - bd) << 1;
 
-    int m4 = 2*(ab - cd);
-    int m5 = ONE - 2*(a2 + c2);
-    int m6 = 2*(bc + ad);
+    int m4 = (ab - cd) << 1;
+    int m5 = ONE - ((a2 + c2) << 1);
+    int m6 = (bc + ad) << 1;
 
-    int m8 = 2*(ac + bd);
-    int m9 = 2*(bc - ad);
-    int m10 = ONE - 2*(a2 + b2);
+    int m8 = (ac + bd) << 1;
+    int m9 = (bc - ad) << 1;
+    int m10 = ONE - ((a2 + b2) << 1);
 	gte_setColumnVectors
 	(
 		m0, m1, m2,
@@ -260,14 +259,9 @@ static void SetGteViewAndModel(const Camera* cam, const DrawObj* obj)
         0,   0,   ONE
     );
 
-    // // 2) Apply VIEW rotation = inverse of camera rotation
-    // //    (world rotates opposite the camera)
-    // rotateCurrentMatrix(-cam->yaw, -cam->pitch, 0);
-
-	//quat version for camera gimble lock fix...
 	//2) create view quaterion and set view rot matrix
-	//	... (world rotates opposite the camera)
-	Quat rot = QuatRot(-cam->yaw, -cam->pitch, 0);
+	//  ... quat version for camera gimble lock fix...
+	Quat rot = QuatRot(cam->yaw, cam->pitch, 0); //not inverted here
 	SetMatrixFromQuatRot(rot);
 
     // 3) Compute T = R_view * (P_obj - C)

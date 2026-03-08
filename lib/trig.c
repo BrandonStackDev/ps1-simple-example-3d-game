@@ -61,30 +61,32 @@ int isin2(int x) {
 
 /// @brief compute index (bucket given quadrant is divided into 32s) 
 ///      - in quadrant from abs values of x and y (++ quad)
-/// @param x 
-/// @param y 
+/// @param x expects this to be positive even tho unsigned
+/// @param y expects this to be positive even tho unsigned
 /// @return 0-32
 uint8_t compute_index(int16_t x, int16_t y)
 {
 	if(y==0)		{return 0;}
 	else if(x==0)	{return 32;}
-	int i = 0;
 	int r = 0;
 	if(x > y)
 	{
 		int _y = y << 12;
 		r = _y/x;
+		if(r>3737)		{return 16;}
+		else if(r>2221)	{return ((r/267)+2);}
+		else 			{return (r/202);}
 	}
 	else
 	{
 		int _x = x << 12;
 		r = _x/y;
-		i=16;
+		int i=16;
+		if(r>3737)		{return 16;}
+		else if(r>2221)	{return 29-(r/267);}
+		else 			{return 31-(r/202);}
 	}
-	if(r>3737)		{return 16;}
-	else if(r>2221)	{return i+=((r/267)+2);}
-	else 			{return i+=(r/202);}
-	return i;
+	
 }
 
 /// @brief arctan from x and y values

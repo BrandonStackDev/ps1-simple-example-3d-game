@@ -84,3 +84,6 @@ Also, i have something like this in my .vscode\c_cpp_properties.json for intelli
 ```
 
 to build just call "build" from cmd in the project folder
+
+used the following for python libs to install 
+ - pip install numpy pillow

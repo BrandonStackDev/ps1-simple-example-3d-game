@@ -11,6 +11,7 @@
 #include "lib/draw.h"
 #include "lib/pad.h"
 #include "lib/setup.h"
+#include "lib/font.h"
 
 
 int main(int argc, const char **argv) 
@@ -84,9 +85,11 @@ int main(int argc, const char **argv)
 
 		//will be a loop in the future over each object in the display arena
 			//draw the ground
-			DrawObject(chain, &groundObj, &camera);
+			//DrawObject(chain, &groundObj, &camera);
 			//draw the character
-			DrawObject(chain, &playerObj, &camera);
+			//DrawObject(chain, &playerObj, &camera);
+		//font test
+		printString(chain, &font, 16, 64, "hello world!\n");
 		//finish it up
 		FinishDraw(chain, bufferX, bufferY);
 		

@@ -17,7 +17,7 @@
 
 //defined pre build externally
 extern const uint8_t fontTexture[], fontPalette[];
-
+TextureInfo font;
 // In order to pick sprites (characters) out of our spritesheet, we need a table
 // listing all of them (in ASCII order in this case) with their UV coordinates
 // within the sheet as well as their dimensions. In this example we're going to

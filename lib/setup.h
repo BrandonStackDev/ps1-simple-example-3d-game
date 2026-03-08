@@ -5,6 +5,7 @@
 #include "../lib/gpu.h"
 #include "../lib/draw.h"
 #include "../lib/pad.h"
+#include "font.h"
 
 #pragma once
 
@@ -34,4 +35,17 @@ static void GeneralSetup()
 
 	GPU_GP1 = gp1_dmaRequestMode(GP1_DREQ_GP0_WRITE);
 	GPU_GP1 = gp1_dispBlank(false);
+
+	uploadIndexedTexture(
+		&font,
+		fontTexture,
+		fontPalette,
+		SCREEN_WIDTH * 2,
+		0,
+		SCREEN_WIDTH * 2,
+		FONT_HEIGHT,
+		FONT_WIDTH,
+		FONT_HEIGHT,
+		FONT_COLOR_DEPTH
+	);
 }

@@ -141,6 +141,19 @@ uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands, bool fina
     return &ptr[1];
 }
 
+uint32_t *allocateTexturePacket(DMAChain *chain, int numCommands) 
+{
+	assert((numCommands >= 0) && (numCommands <= DMA_MAX_CHUNK_SIZE));
+
+	uint32_t *ptr      = chain->nextPacket;
+	chain->nextPacket += numCommands + 1;
+
+	*ptr = gp0_tag(numCommands, chain->nextPacket);
+	assert(chain->nextPacket < &(chain->data)[CHAIN_BUFFER_SIZE]);
+
+	return &ptr[1];
+}
+
 void uploadTexture(
 	TextureInfo *info,
 	const void  *data,

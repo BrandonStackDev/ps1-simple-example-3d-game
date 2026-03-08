@@ -22,9 +22,9 @@ int main(int argc, const char **argv)
 	bool     usingSecondFrame = false;
 
 	//create draw stuff
+	// - camera
 	Camera camera = {0};
 	camera.pitch = -128;
-	// - first camera
 	// - create drawable ground object
 	DrawObj groundObj = CreateDrawObj(
 		0,0,0, 0,0,0, 

@@ -57,7 +57,12 @@ dkms.conf
 #build/*
 build/*
 
+#prep work
+assets/dat/*
+assets/inc/*
+
 #text notes and stuff
+notes/*
 scratch.txt
 *code_out.txt
 notes.txt

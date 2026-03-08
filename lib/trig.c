@@ -59,33 +59,29 @@ int isin2(int x) {
 	return (c >= 0) ? y : (-y);
 }
 
-/// @brief compute index (bucket given quadrant is divided into 32s) 
-///      - in quadrant from abs values of x and y (++ quad)
-/// @param x expects this to be positive even tho unsigned
-/// @param y expects this to be positive even tho unsigned
-/// @return 0-32
-uint8_t compute_index(int16_t x, int16_t y)
+
+#define CI_GPT_BUCKETS 1024
+#define CI_GPT_MAX (CI_GPT_BUCKETS - 1)
+#define CI_GPT_HALF (CI_GPT_BUCKETS >> 1)
+#define CI_GPT_HALF_MAX (CI_GPT_HALF - 1)
+
+/// @brief chatGPT version of bucket finding for atan2
+///			- originally I wrote my own, but it didnt work nearly as well as this (it did work tho...just saying)
+/// @param x 
+/// @param y 
+/// @return 0..CI_GPT_BUCKETS - 1
+static uint16_t compute_index(int16_t x, int16_t y)
 {
-	if(y==0)		{return 0;}
-	else if(x==0)	{return 32;}
-	int r = 0;
-	if(x > y)
+    if (y == 0) {return 0;}
+    else if (x == 0) {return CI_GPT_MAX;}
+    if (x >= y) // lower half of quadrant
 	{
-		int _y = y << 12;
-		r = _y/x;
-		if(r>3737)		{return 16;}
-		else if(r>2221)	{return ((r/267)+2);}
-		else 			{return (r/202);}
-	}
-	else
+        return (uint16_t)(((int32_t)y * CI_GPT_HALF_MAX) / x);
+    } 
+	else // upper half of quadrant
 	{
-		int _x = x << 12;
-		r = _x/y;
-		int i=16;
-		if(r>3737)		{return 16;}
-		else if(r>2221)	{return 29-(r/267);}
-		else 			{return 31-(r/202);}
-	}
+        return (uint16_t)(CI_GPT_MAX - (((int32_t)x * CI_GPT_HALF_MAX) / y));
+    }
 }
 
 /// @brief arctan from x and y values
@@ -100,10 +96,10 @@ int16_t atan2(int16_t y, int16_t x)
 	int16_t _x = xwn ? -x: x; //abs x
 	int16_t _y = ywn ? -y: y; //abs y
 	//compute index, swap rolls if x xor y was negative
-	uint8_t i = xwn^ywn ? compute_index(_y,_x) : compute_index(_x,_y);
-	if(xwn && !ywn) 		{rtn = (i << 5) + 1024;} 	//-+ quad, i * 32; << 5 is same
-	else if(xwn && ywn) 	{rtn = (i << 5) + 2048;} 	//-- quad
-	else if(!xwn && ywn) 	{rtn = (i << 5) + 3072;} 	//+- quad
-	else  					{rtn = (i << 5);} 			//++ quad
+	uint16_t i = xwn^ywn ? compute_index(_y,_x) : compute_index(_x,_y);
+	if(xwn && !ywn) 		{rtn = (i) + 1024;} 	//-+ quad, i * 32; << 5 is same
+	else if(xwn && ywn) 	{rtn = (i) + 2048;} 	//-- quad
+	else if(!xwn && ywn) 	{rtn = (i) + 3072;} 	//+- quad
+	else  					{rtn = (i);} 			//++ quad
 	return rtn%4096; //make sure its in range
 }

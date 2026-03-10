@@ -1,6 +1,6 @@
 import random
 import argparse
-import struct
+import struct #H=16bit,h=8bit,I=32bit
 
 #crete the parser
 parser = argparse.ArgumentParser(description="Parse Obj Files and spit out new file for PS1 draw objects.")

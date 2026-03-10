@@ -12,6 +12,7 @@
 
 typedef struct {
 	uint16_t  vertices[3];
+    uint16_t  _padding;
 	uint32_t color;
 } Face;
 

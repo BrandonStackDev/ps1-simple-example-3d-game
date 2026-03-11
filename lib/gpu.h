@@ -61,7 +61,6 @@ void sendVRAMData(
 );
 void clearOrderingTable(uint32_t *table, int numEntries);
 uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands, bool final);
-uint32_t *allocateTexturePacket(DMAChain *chain, int numCommands);
 
 void uploadTexture(
 	TextureInfo *info,

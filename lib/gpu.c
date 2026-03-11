@@ -127,7 +127,8 @@ uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands, bool fina
 
     // Need (numCommands + 1) words in chain->data
 	int space = final ? CHAIN_BUFFER_SIZE: CHAIN_BUFFER_SIZE-8 ;
-    if (chain->nextPacket + (numCommands + 1) > &(chain->data)[space]) //CHAIN_BUFFER_SIZE-8 here because we need room for the end of the commands to finalize the draw
+	//CHAIN_BUFFER_SIZE-8 here because we need room for the end of the commands to finalize the draw
+    if (chain->nextPacket + (numCommands + 1) > &(chain->data)[space])
 	{
         return NULL; // out of space
     }
@@ -139,19 +140,6 @@ uint32_t *allocatePacket(DMAChain *chain, int zIndex, int numCommands, bool fina
     chain->orderingTable[zIndex] = gp0_tag(0, ptr);
 
     return &ptr[1];
-}
-
-uint32_t *allocateTexturePacket(DMAChain *chain, int numCommands) 
-{
-	assert((numCommands >= 0) && (numCommands <= DMA_MAX_CHUNK_SIZE));
-
-	uint32_t *ptr      = chain->nextPacket;
-	chain->nextPacket += numCommands + 1;
-
-	*ptr = gp0_tag(numCommands, chain->nextPacket);
-	assert(chain->nextPacket < &(chain->data)[CHAIN_BUFFER_SIZE]);
-
-	return &ptr[1];
 }
 
 void uploadTexture(

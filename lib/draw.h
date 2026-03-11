@@ -10,6 +10,9 @@
 
 #pragma once
 
+#define SCREEN_WIDTH  320
+#define SCREEN_HEIGHT 240
+
 #define ENABLE_Z_CLIP false
 #define CAMERA_DIST_RADIUS 256
 // The GTE uses a 20.12 fixed-point format for most values. What this means is
@@ -539,16 +542,13 @@ static void DrawObject(
 	}
 }
 
-#define SCREEN_WIDTH  320
-#define SCREEN_HEIGHT 240
-
 static bool FinishDraw(DMAChain *chain, int bufferX, int bufferY)
 {
 	//finalize
 	uint32_t *ptr;
 	ptr    = allocatePacket(chain, ORDERING_TABLE_SIZE - 1, 3, true);
 	if (!ptr){ return false; }
-	ptr[0] = gp0_rgb(64, 64, 64) | gp0_vramFill();
+	ptr[0] = gp0_rgb(16, 32, 64) | gp0_vramFill();
 	ptr[1] = gp0_xy(bufferX, bufferY);
 	ptr[2] = gp0_xy(SCREEN_WIDTH, SCREEN_HEIGHT);
 

@@ -68,27 +68,25 @@ int main(int argc, const char **argv)
 		//set camera
 		int16_t rise = isin(camera.orbit_yaw);
 		int16_t run = icos(camera.orbit_yaw);
-		//fixed point math, bit shift after multiply for better precision, 
+		//fixed point math, bit shift after multiply
 		// - 12 bits because 2048 = PI 
 		// - and 1 on unit circle is 4096
 		camera.x = playerObj.x + ((run * CAMERA_DIST_RADIUS) >> 12); 
 		camera.z = playerObj.z - ((rise * CAMERA_DIST_RADIUS) >> 12);
 		camera.y = playerObj.y - (200);   // some height, y is inverted?
-		// - example from donogan, player is target, pos is camera pos
-		// 		float dxT = b->targetPos.x - b->pos.x;
-		// 		float dzT = b->targetPos.z - b->pos.z;
-		//		float yawToTarget = (RAD2DEG * atan2f(dxT, dzT));
+		//set the camera yaw to point at the player
 		int16_t dx = playerObj.x - camera.x;
 		int16_t dz = playerObj.z - camera.z;
 		camera.yaw = atan2(dx,dz);
 
-		//will be a loop in the future over each object in the display arena
-			//draw the ground
-			DrawObject(chain, &groundObj, &camera);
-			//draw the character
-			DrawObject(chain, &playerObj, &camera);
 		//font test
 		printString(chain, &font, 16, 16, "hello world!\n");
+		//*(chain->nextPacket) = gp0_endTag(0);
+		//will be a loop in the future over each object in the display arena
+			//draw the character
+			DrawObject(chain, &playerObj, &camera);
+			//draw the ground
+			DrawObject(chain, &groundObj, &camera);
 		//finish it up
 		FinishDraw(chain, bufferX, bufferY);
 		

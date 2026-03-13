@@ -14,9 +14,11 @@
 #define FONT_WIDTH        96
 #define FONT_HEIGHT       56
 #define FONT_COLOR_DEPTH GP0_COLOR_4BPP
+#define FONT_TEXTURE_LEN 2688
+#define FONT_PALETTE_LEN 32
 
 //defined pre build externally
-extern const uint8_t fontTexture[], fontPalette[];
+extern const uint8_t fontTexture[FONT_TEXTURE_LEN], fontPalette[FONT_PALETTE_LEN];
 TextureInfo font;
 // In order to pick sprites (characters) out of our spritesheet, we need a table
 // listing all of them (in ASCII order in this case) with their UV coordinates
@@ -130,12 +132,6 @@ static void printString(DMAChain *chain, const TextureInfo *font, int x, int y, 
 {
 	int currentX = x, currentY = y;
 	uint32_t *ptr;
-	// Start by sending a texpage command to tell the GPU to use the font's
-	// spritesheet. Note that the texpage command before a drawing command can
-	// be omitted when reusing the same texture, so sending it here just once is
-	// enough.
-	ptr    = allocatePacket(chain, 0, 1, false);
-	ptr[0] = gp0_texpage(font->page, false, false);
 	// Iterate over every character in the string.
 	for (; *str; str++) 
 	{
@@ -178,4 +174,10 @@ static void printString(DMAChain *chain, const TextureInfo *font, int x, int y, 
 		// Move onto the next character.
 		currentX += sprite->width;
 	}
+	// Start by sending a texpage command to tell the GPU to use the font's
+	// spritesheet. Note that the texpage command before a drawing command can
+	// be omitted when reusing the same texture, so sending it here just once is
+	// enough.
+	ptr    = allocatePacket(chain, 0, 1, false);
+	ptr[0] = gp0_texpage(font->page, false, false);
 }

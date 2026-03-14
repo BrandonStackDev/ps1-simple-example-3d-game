@@ -419,19 +419,10 @@ static AddTriResult AddTri(
 		return ADD_TRI_CLIP;
 	}
 
-	// Determine the winding order of the vertices on screen. If they
-	// are ordered clockwise then the face is visible, otherwise it can
-	// be skipped as it is not facing the camera.
+	// backface culling
 	gte_command(GTE_CMD_NCLIP); 
 	int order = gte_getDataReg(GTE_MAC0);
-
 	if (order <= 0){return ADD_TRI_BAD;}
-
-	// Save the first transformed vertex (the GTE only keeps the X/Y
-	// coordinates of the last 3 vertices processed and Z coordinates of
-	// the last 4 vertices processed) and apply projection to the last
-	// vertex.
-	uint32_t xy0 = gte_getDataReg(GTE_SXY0);
 
 	// Calculate the average Z coordinate of all vertices and use it to
 	// determine the ordering table bucket index for this face.
@@ -447,9 +438,7 @@ static AddTriResult AddTri(
 	ptr    = allocatePacket(chain, zIndex, 4, false);
 	if (!ptr){ return ADD_TRI_BAD; }
 	ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
-	//ptr[0] = face->color | gp0_triangle(false, false);
-	ptr[1] = xy0;
-	gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
+	gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);//I think 4 because bytes, 4 bytes is 32 bits
 	gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
 	gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
 	return ADD_TRI_GOOD;

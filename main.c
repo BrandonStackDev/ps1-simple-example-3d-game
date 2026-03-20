@@ -38,6 +38,8 @@ int main(int argc, const char **argv)
 		NUM_PLAYER_FACES, playerFaces, 
 		NUM_PLAYER_VERTICES, playerVertices
 	);
+	playerObj.isTextured = true;
+	playerObj.textinfo = &playerTextInfo;
 
 	while(true)
 	{

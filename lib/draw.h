@@ -79,6 +79,8 @@ typedef struct {
 	const Face *faces;
 	uint16_t numVerts; //TODO: I didnt need this early on, if its wasteful, remove
 	const GTEVector16 *vertices;
+	bool isTextured;
+	const TextureInfo *textinfo;
 } DrawObj;
 
 static DrawObj CreateDrawObj(
@@ -99,6 +101,7 @@ static DrawObj CreateDrawObj(
 	obj.faces = faces;
 	obj.numVerts = numVerts;
 	obj.vertices = vertices;
+	obj.isTextured = false;
 	return obj;
 }
 
@@ -400,7 +403,8 @@ static bool AddClippedTri(
 /// @return 
 static AddTriResult AddTri(
 	const GTEVector16* tv0, const GTEVector16* tv1, const GTEVector16* tv2, 
-	DMAChain *chain, const Face *face
+	DMAChain *chain, const Face *face,
+	bool textured,const TextureInfo *textInfo
 )
 {
 	// apply perspective to computed tris
@@ -435,12 +439,33 @@ static AddTriResult AddTri(
 	// Create a new tri and give its vertices the X/Y coordinates
 	// calculated by the GTE.
 	uint32_t *ptr;
-	ptr    = allocatePacket(chain, zIndex, 4, false);
-	if (!ptr){ return ADD_TRI_BAD; }
-	ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
-	gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);//I think 4 because bytes, 4 bytes is 32 bits
-	gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
-	gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
+	if(textured)
+	{
+		//--best guess for texture
+		ptr    = allocatePacket(chain, zIndex, 7, false);
+		ptr[0] = 0xFFFFFF | gp0_triangle(true, false);
+		gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
+		//word 2 = CLUT<<16 | (V1<<8) | U1
+		ptr[2] = textInfo->clut<<16 | (0<<8) | 0;
+		gte_storeDataReg(GTE_SXY1, 3 * 4, ptr);
+		//word 4 = PAGE<<16 | (V2<<8) | U2
+		ptr[4] = textInfo->page<<16 | (10<<8) | 12;
+		gte_storeDataReg(GTE_SXY2, 5 * 4, ptr);
+		//word 6 = 0<<16 | (V3<<8) | U3
+		ptr[6] = 0<<16 | (5<<8) | 2;
+		//--and then page (rem after cause exec in rev) //todo: do this per object if textured
+		ptr    = allocatePacket(chain, 0, 1, false);
+		ptr[0] = gp0_texpage(textInfo->page, false, false);
+	}
+	else
+	{
+		ptr    = allocatePacket(chain, zIndex, 4, false);
+		if (!ptr){ return ADD_TRI_BAD; }
+		ptr[0] = face->color | gp0_shadedTriangle(false, false, false);
+		gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);//I think 4 because bytes, 4 bytes is 32 bits
+		gte_storeDataReg(GTE_SXY1, 2 * 4, ptr);
+		gte_storeDataReg(GTE_SXY2, 3 * 4, ptr);
+	}
 	return ADD_TRI_GOOD;
 }
 
@@ -457,7 +482,13 @@ static void DrawObject(
 	for (int i = 0; i < obj->numFaces; i++) 
 	{
 		const Face *face = &(obj->faces)[i];
-		AddTriResult res = AddTri(&(obj->vertices)[face->vertices[0]],&(obj->vertices)[face->vertices[1]],&(obj->vertices)[face->vertices[2]], chain, face);
+		AddTriResult res = AddTri(
+			&(obj->vertices)[face->vertices[0]],
+			&(obj->vertices)[face->vertices[1]],
+			&(obj->vertices)[face->vertices[2]], 
+			chain, face, 
+			obj->isTextured, obj->textinfo
+		);
 		if(ENABLE_Z_CLIP && res==ADD_TRI_CLIP) //handle clipping of near plane
 		{
 			//initial tri work (no perspective because we dont want to risk overflow yet)

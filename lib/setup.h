@@ -48,4 +48,17 @@ static void GeneralSetup()
 		FONT_HEIGHT,
 		FONT_COLOR_DEPTH
 	);
+
+	uploadIndexedTexture(
+		&playerTextInfo,
+		playerTexture,
+		playerPalette,
+		SCREEN_WIDTH * 2,
+		0,
+		SCREEN_WIDTH * 2,
+		8,
+		8,
+		8,
+		GP0_COLOR_4BPP
+	);
 }

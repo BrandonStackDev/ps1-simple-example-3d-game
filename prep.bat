@@ -20,6 +20,11 @@ python tools\linkData.py playerFaces assets\dat\player_faces.dat
 python tools\linkData.py levelVertices assets\dat\level_verts.dat
 python tools\linkData.py levelFaces assets\dat\level_faces.dat
 
+REM generate player texture stuff
+python tools\convertImage.py -b 4 assets\png\char01.png assets\dat\char_01_t.dat assets\dat\char_01_p.dat
+REM generate player texture and palette .S
+python tools\linkData.py playerTexture assets\dat\char_01_t.dat
+python tools\linkData.py playerPalette assets\dat\char_01_p.dat
 
 REM generate font data files
 python tools\convertImage.py -b 4 assets\png\font.png assets\dat\fontTexture.dat assets\dat\fontPalette.dat

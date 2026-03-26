@@ -18,7 +18,7 @@ typedef struct {
 } Face;
 
 typedef struct {
-	uint16_t u, v; //todo: can i make this 8?
+	uint8_t u, v; //no uv greater than 255
 } TextCoord;
 
 #define NUM_PLAYER_VERTICES 170

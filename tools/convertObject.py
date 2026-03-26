@@ -57,7 +57,7 @@ if(t_w != 0 and t_h != 0):
     print(len(vt))
     a = open(f'assets/dat/{out_path}_vert_text.dat','wb')
     for x in vt:
-        a.write(struct.pack("<HH", 
+        a.write(struct.pack("<BB", 
             int(float(x[0])*t_w), #u, width
             int((1-float(x[1]))*t_h))) #v, height, flipped for PS1
     a.close()

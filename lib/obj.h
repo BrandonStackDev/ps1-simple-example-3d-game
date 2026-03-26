@@ -11,14 +11,21 @@
 #pragma once
 
 typedef struct {
-	uint16_t  vertices[3];
-    uint16_t  _padding;
+	uint16_t  vertices[3];  //todo: can I make this 8?
+	uint16_t  textCoords[3]; //todo: can I make this 8?
+    //uint16_t  _padding;
 	uint32_t color;
 } Face;
 
+typedef struct {
+	uint16_t u, v; //todo: can i make this 8?
+} TextCoord;
+
 #define NUM_PLAYER_VERTICES 170
+#define NUM_PLAYER_TEXT_COORDS 20
 #define NUM_PLAYER_FACES 336
 extern const GTEVector16 playerVertices[NUM_PLAYER_VERTICES];
+extern const TextCoord playerTextCoords[NUM_PLAYER_TEXT_COORDS];
 extern const Face playerFaces[NUM_PLAYER_FACES];
 
 #define PLAYER_TEXTURE_LEN 2048

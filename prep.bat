@@ -12,10 +12,11 @@ REM for /r ".\assets\dat\"   %%F in (*.dat) do (python tools\convertData.py "%%F
 
 
 REM generate obj data files
-python tools\convertObject.py assets\obj\char_01.obj 16 player
+python tools\convertObject.py assets\obj\char_01.obj 16 player 64 64
 python tools\convertObject.py assets\obj\level_01.obj 2048 level
 REM generate .s
 python tools\linkData.py playerVertices assets\dat\player_verts.dat
+python tools\linkData.py playerTextCoords assets\dat\player_vert_text.dat
 python tools\linkData.py playerFaces assets\dat\player_faces.dat
 python tools\linkData.py levelVertices assets\dat\level_verts.dat
 python tools\linkData.py levelFaces assets\dat\level_faces.dat

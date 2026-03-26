@@ -36,29 +36,33 @@ static void GeneralSetup()
 	GPU_GP1 = gp1_dmaRequestMode(GP1_DREQ_GP0_WRITE);
 	GPU_GP1 = gp1_dispBlank(false);
 
+	int double_screen = SCREEN_WIDTH << 1;
+	//font texture
 	uploadIndexedTexture(
 		&font,
 		fontTexture,
 		fontPalette,
-		SCREEN_WIDTH * 2,
+		double_screen,
 		0,
-		SCREEN_WIDTH * 2,
+		double_screen,
 		FONT_HEIGHT,
 		FONT_WIDTH,
 		FONT_HEIGHT,
 		FONT_COLOR_DEPTH
 	);
-
+	int offset_from_font = FONT_HEIGHT+16; //(16 is a guess for font palette size)
+	//todo: i need a way to track this and uise the space efficiently but automatically know what x and y's to use
+	//player texture
 	uploadIndexedTexture(
 		&playerTextInfo,
 		playerTexture,
 		playerPalette,
-		SCREEN_WIDTH * 2,
-		0,
-		SCREEN_WIDTH * 2,
-		8,
-		8,
-		8,
+		double_screen,
+		offset_from_font, 
+		double_screen,
+		offset_from_font + 64, //my image is 64x64, we are storing straight down (probably wastes some x space), so x is same as font, but y needs to be adjusted 
+		64,
+		64,
 		GP0_COLOR_4BPP
 	);
 }

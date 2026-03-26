@@ -40,6 +40,7 @@ int main(int argc, const char **argv)
 	);
 	playerObj.isTextured = true;
 	playerObj.textinfo = &playerTextInfo;
+	playerObj.textCoords = playerTextCoords; //this guy is an array so already pointer
 
 	while(true)
 	{

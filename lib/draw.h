@@ -81,6 +81,7 @@ typedef struct {
 	const GTEVector16 *vertices;
 	bool isTextured;
 	const TextureInfo *textinfo;
+	const TextCoord *textCoords;
 } DrawObj;
 
 static DrawObj CreateDrawObj(
@@ -404,7 +405,7 @@ static bool AddClippedTri(
 static AddTriResult AddTri(
 	const GTEVector16* tv0, const GTEVector16* tv1, const GTEVector16* tv2, 
 	DMAChain *chain, const Face *face,
-	bool textured,const TextureInfo *textInfo
+	bool textured, const TextureInfo *textInfo, const TextCoord *textCoords
 )
 {
 	// apply perspective to computed tris
@@ -446,13 +447,13 @@ static AddTriResult AddTri(
 		ptr[0] = 0xFFFFFF | gp0_triangle(true, false);
 		gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
 		//word 2 = CLUT<<16 | (V1<<8) | U1
-		ptr[2] = textInfo->clut<<16 | (0<<8) | 0;
+		ptr[2] = textInfo->clut<<16 | ((&textCoords)[face->textCoords[0]]->v<<8) | (&textCoords)[face->textCoords[0]]->v;
 		gte_storeDataReg(GTE_SXY1, 3 * 4, ptr);
 		//word 4 = PAGE<<16 | (V2<<8) | U2
-		ptr[4] = textInfo->page<<16 | (10<<8) | 12;
+		ptr[4] = textInfo->page<<16 | ((&textCoords)[face->textCoords[1]]->v<<8) | (&textCoords)[face->textCoords[1]]->v;
 		gte_storeDataReg(GTE_SXY2, 5 * 4, ptr);
 		//word 6 = 0<<16 | (V3<<8) | U3
-		ptr[6] = 0<<16 | (5<<8) | 2;
+		ptr[6] = 0<<16 | ((&textCoords)[face->textCoords[2]]->v<<8) | (&textCoords)[face->textCoords[2]]->v;
 		//--and then page (rem after cause exec in rev) //todo: do this per object if textured
 		ptr    = allocatePacket(chain, 0, 1, false);
 		ptr[0] = gp0_texpage(textInfo->page, false, false);
@@ -487,7 +488,7 @@ static void DrawObject(
 			&(obj->vertices)[face->vertices[1]],
 			&(obj->vertices)[face->vertices[2]], 
 			chain, face, 
-			obj->isTextured, obj->textinfo
+			obj->isTextured, obj->textinfo, obj->textCoords
 		);
 		if(ENABLE_Z_CLIP && res==ADD_TRI_CLIP) //handle clipping of near plane
 		{

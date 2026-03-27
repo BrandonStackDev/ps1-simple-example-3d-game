@@ -77,8 +77,8 @@ for x in f:
     tc3 = 0
     if(len(x)>3):
         tc1 = int(x[3])-1
-        tc1 = int(x[4])-1
-        tc1 = int(x[5])-1
+        tc2 = int(x[4])-1
+        tc3 = int(x[5])-1
     a.write(struct.pack("<HHHHHHI", 
         int(x[0])-1, int(x[1])-1, int(x[2])-1, #verts indices
         tc1,tc2,tc3, #text coords indices

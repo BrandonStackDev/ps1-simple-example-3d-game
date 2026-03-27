@@ -444,17 +444,18 @@ static AddTriResult AddTri(
 	{
 		//--best guess for texture
 		ptr    = allocatePacket(chain, zIndex, 7, false);
-		ptr[0] = 0xFFFFFF | gp0_triangle(true, false);
+		if (!ptr){ return ADD_TRI_BAD; }
+		ptr[0] = 0xFFFFFF | gp0_triangle(true, false); //white tri
 		gte_storeDataReg(GTE_SXY0, 1 * 4, ptr);
 		//word 2 = CLUT<<16 | (V1<<8) | U1
-		ptr[2] = textInfo->clut<<16 | ((&textCoords)[face->textCoords[0]]->v<<8) | (&textCoords)[face->textCoords[0]]->v;
+		ptr[2] = textInfo->clut<<16 | (textCoords[face->textCoords[0]].v<<8) | textCoords[face->textCoords[0]].u;
 		gte_storeDataReg(GTE_SXY1, 3 * 4, ptr);
 		//word 4 = PAGE<<16 | (V2<<8) | U2
-		ptr[4] = textInfo->page<<16 | ((&textCoords)[face->textCoords[1]]->v<<8) | (&textCoords)[face->textCoords[1]]->v;
+		ptr[4] = textInfo->page<<16 | (textCoords[face->textCoords[1]].v<<8) | textCoords[face->textCoords[1]].u;
 		gte_storeDataReg(GTE_SXY2, 5 * 4, ptr);
 		//word 6 = 0<<16 | (V3<<8) | U3
-		ptr[6] = 0<<16 | ((&textCoords)[face->textCoords[2]]->v<<8) | (&textCoords)[face->textCoords[2]]->v;
-		//--and then page (rem after cause exec in rev) //todo: do this per object if textured
+		ptr[6] = 0<<16 | (textCoords[face->textCoords[2]].v<<8) | textCoords[face->textCoords[2]].u;
+		//--and then page (rem after cause exec in rev) //todo: do this per object if textured (but how?)
 		ptr    = allocatePacket(chain, 0, 1, false);
 		ptr[0] = gp0_texpage(textInfo->page, false, false);
 	}

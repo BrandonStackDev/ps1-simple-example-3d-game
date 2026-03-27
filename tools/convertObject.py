@@ -39,10 +39,12 @@ for x in c:
         #v_index / vt_index / vn_index
         tf = x.split(' ')[1:]
         kp = []
+        kp2 = []
         for y in tf:
             stuff = y.split('/') #12/3/14
-            kp.append(stuff[0]+stuff[1]) #[v1,v2,v3,t1,t2,t3]
-        f.append(kp)
+            kp.append(stuff[0])
+            kp2.append(stuff[1]) 
+        f.append(kp+kp2) #[v1,v2,v3,t1,t2,t3]
 
 
 print(len(v))

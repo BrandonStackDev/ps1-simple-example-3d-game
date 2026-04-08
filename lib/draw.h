@@ -455,9 +455,6 @@ static AddTriResult AddTri(
 		gte_storeDataReg(GTE_SXY2, 5 * 4, ptr);
 		//word 6 = 0<<16 | (V3<<8) | U3
 		ptr[6] = 0<<16 | (textCoords[face->textCoords[2]].v<<8) | textCoords[face->textCoords[2]].u;
-		//--and then page (rem after cause exec in rev) //todo: do this per object if textured (but how?)
-		ptr    = allocatePacket(chain, 0, 1, false);
-		ptr[0] = gp0_texpage(textInfo->page, false, false);
 	}
 	else
 	{

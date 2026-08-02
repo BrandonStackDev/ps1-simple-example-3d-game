@@ -31,7 +31,18 @@ if errorlevel 1 exit /b 1
 
 echo OK: build\game.psexe
 
-@REM REM convert to iso also, not ready yet
-@REM exe2iso build\game.psexe -o build\game.bin
-@REM if errorlevel 1 exit /b 1
-@REM echo Created ISO
+REM 4) Build PS1 CD image
+
+REM Build the normal PS1 BIN/CUE image
+mkpsxiso.exe -y "disc.xml"
+
+if errorlevel 1 exit /b 1
+
+REM Also build a single-file ISO image
+mkpsxiso.exe -y "disc_iso.xml"
+
+if errorlevel 1 exit /b 1
+
+echo OK: build\game.bin
+echo OK: build\game.cue
+echo OK: build\game.iso

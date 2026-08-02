@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<iso_project
+    image_name="build/game.bin"
+    cue_sheet="build/game.cue">
+
+    <track type="data" cdvd_style="false">
+
+        <identifiers
+            system="PLAYSTATION"
+            application="PLAYSTATION"
+            volume="PS1DEMO"
+            volume_set="PS1DEMO"
+            publisher="BRANDON"
+            data_preparer="MKPSXISO"
+        />
+
+        <directory_tree>
+            <file
+                name="SYSTEM.CNF"
+                type="data"
+                source="disc/SYSTEM.CNF"
+            />
+
+            <file
+                name="GAME.EXE"
+                type="data"
+                source="build/game.psexe"
+            />
+
+            <!-- Adds 2MB of safe padding at the end of the disc. -->
+            <dummy sectors="1024" type="0"/>
+        </directory_tree>
+
+    </track>
+
+</iso_project>
